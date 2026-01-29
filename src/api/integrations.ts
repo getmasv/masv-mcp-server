@@ -47,7 +47,7 @@ const SendPackageToIntegrationSchema = z.object({
     ),
   integrationId: z
     .string()
-    .describe("Id of the integration to transfer package to"),
+    .describe("Id of the integration to transfer package to. Integration should have direction: masv_to_cloud."),
 });
 
 type SendPackageToIntegrationParams = z.infer<
