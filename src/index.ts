@@ -62,7 +62,7 @@ if (!MASV_TEAM_ID || !MASV_API_KEY) throw new Error("Please set MASV_TEAM_ID and
 // Server instance
 const server = new McpServer({
   name: "masv-mcp-server",
-  version: "0.0.0",
+  version: "1.0.0",
 });
 
 // Tools
