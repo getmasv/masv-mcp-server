@@ -105,3 +105,27 @@ MIT
 ## Support
 
 For questions, issues, or feedback please contact us at [support@masv.io](mailto:support@masv.io).
+
+## Development
+
+### Install dependencies
+```
+npm install
+```
+
+### Build
+```
+npm run build
+```
+
+### Use MCP server
+In LLM chat application add command to start the server:
+```
+node /path/to/masv-mcp-server/build/index.js
+```
+
+To run MCP inspector to inspect and execute tools
+
+```
+npm run inspector
+```
