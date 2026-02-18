@@ -6,13 +6,7 @@ An MCP (Model Context Protocol) server that provides LLMs with tools to interact
 
 ## What is MASV?
 
-MASV (massive.io) is a file transfer platform designed for large media files. It enables secure and fast transfer of large files with features including:
-
-- Package uploads and downloads
-- File collection through customizable Portals
-- Cloud and on-premise storage integrations (AWS S3, Azure, Frame.io, Dropbox, MASV Storage Gateway, and more)
-- Activity tracking and event monitoring
-- Team collaboration and access controls
+MASV is an easy-to-use and ultra-reliable managed file transfer service designed for teams of all sizes. It allows users to send and receive massive files without size limits, while ensuring data integrity and security through its robust cloud infrastructure that supports cloud, on-prem, and hybrid workflows.
 
 Learn more https://massive.io/
 

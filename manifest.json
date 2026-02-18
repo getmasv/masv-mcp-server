@@ -3,8 +3,8 @@
     "name": "masv-mcp-server",
     "display_name": "MASV MCP Server",
     "version": "0.0.1",
-    "description": "MASV MCP server provides LLMs with tools to control MASV API",
-    "long_description": "The MASV MCP Server enables AI assistants to interact with the MASV API. It provides comprehensive tools for package management, portal operations, activity tracking, and integration with cloud storage services and MASV Storage Gateway. MASV is a secure file transfer platform designed for moving large media files.",
+    "description": "MASV is an easy-to-use, secure, and ultra-reliable cloud-based and on-prem managed file transfer service for large file workflows.",
+    "long_description": "The MASV MCP Server enables AI assistants to interact with the MASV API. It provides comprehensive tools for package management, portal operations, activity tracking, and integration with cloud storage services and MASV Storage Gateway. MASV is an easy-to-use and ultra-reliable managed file transfer service designed for teams of all sizes. It allows users to send and receive massive files without size limits, while ensuring data integrity and security through its robust cloud infrastructure that supports cloud, on-prem, and hybrid workflows.",
     "author": {
         "name": "Vladyslav Ilchenko"
     },
