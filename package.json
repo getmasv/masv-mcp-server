@@ -21,17 +21,19 @@
     "scripts": {
         "build": "tsc && chmod 755 build/index.js",
         "test": "echo \"Error: no test specified\" && exit 1",
-        "inspector": "npx @modelcontextprotocol/inspector node ./build/index.js"
+        "inspector": "npx @modelcontextprotocol/inspector node ./build/index.js",
+        "bundle": "npm run build && npx @anthropic-ai/mcpb pack . masv-mcp-server.mcpb"
     },
     "files": [
         "build"
     ],
     "dependencies": {
-        "@modelcontextprotocol/sdk": "^1.25.3",
+        "@modelcontextprotocol/sdk": "^1.26.0",
         "zod": "^4.3.6"
     },
     "devDependencies": {
-        "@types/node": "^25.1.0",
+        "@anthropic-ai/mcpb": "^2.1.2",
+        "@types/node": "^25.2.3",
         "typescript": "^5.9.3"
     }
 }

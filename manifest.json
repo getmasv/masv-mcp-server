@@ -1,0 +1,157 @@
+{
+    "manifest_version": "0.3",
+    "name": "masv-mcp-server",
+    "display_name": "MASV MCP Server",
+    "version": "0.0.1",
+    "description": "MASV MCP server provides LLMs with tools to control MASV API",
+    "long_description": "The MASV MCP Server enables AI assistants to interact with the MASV API. It provides comprehensive tools for package management, portal operations, activity tracking, and integration with cloud storage services and MASV Storage Gateway. MASV is a secure file transfer platform designed for moving large media files.",
+    "author": {
+        "name": "Vladyslav Ilchenko"
+    },
+    "keywords": [
+        "masv",
+        "massive",
+        "file",
+        "transfer",
+        "mcp",
+        "llm",
+        "ai",
+        "cloud-storage",
+        "api"
+    ],
+    "license": "MIT",
+    "server": {
+        "type": "node",
+        "entry_point": "build/index.js",
+        "mcp_config": {
+            "command": "node",
+            "args": [
+                "${__dirname}/build/index.js"
+            ],
+            "env": {
+                "MASV_TEAM_ID": "${user_config.masv_team_id}",
+                "MASV_API_KEY": "${user_config.masv_api_key}",
+                "MASV_ALLOW_DELETE": "${user_config.masv_allow_delete}"
+            }
+        }
+    },
+    "user_config": {
+        "masv_team_id": {
+            "type": "string",
+            "title": "MASV Team ID",
+            "description": "Your MASV team ID for API authentication",
+            "required": true,
+            "sensitive": false
+        },
+        "masv_api_key": {
+            "type": "string",
+            "title": "MASV API Key",
+            "description": "Your MASV API key for authentication",
+            "required": true,
+            "sensitive": true
+        },
+        "masv_allow_delete": {
+            "type": "boolean",
+            "title": "Allow Delete Operations",
+            "description": "Enable delete operations for packages and portals (use with caution)",
+            "required": false,
+            "default": false
+        }
+    },
+    "tools": [
+        {
+            "name": "get_packages",
+            "description": "Get team packages sent directly to MASV"
+        },
+        {
+            "name": "get_package",
+            "description": "Get package by ID"
+        },
+        {
+            "name": "get_portal_packages",
+            "description": "Get packages uploaded to MASV Portals"
+        },
+        {
+            "name": "get_package_files",
+            "description": "Get list of files in a package"
+        },
+        {
+            "name": "get_package_transfers",
+            "description": "Get all transfers of a package to storage"
+        },
+        {
+            "name": "update_package_expiration_date_and_time",
+            "description": "Update package expiration date and time"
+        },
+        {
+            "name": "delete_package",
+            "description": "Delete a package by ID (requires MASV_ALLOW_DELETE=true)"
+        },
+        {
+            "name": "get_activities",
+            "description": "Get activities (events for packages, links, and transfers)"
+        },
+        {
+            "name": "get_activity_events",
+            "description": "Get history of events for a given activity"
+        },
+        {
+            "name": "get_activities_information",
+            "description": "Get detailed information about all activity types and states"
+        },
+        {
+            "name": "get_integrations",
+            "description": "Get list of connected integrations (AWS S3, Frame.io, etc.)"
+        },
+        {
+            "name": "send_package_to_integration",
+            "description": "Send MASV package to connected integration"
+        },
+        {
+            "name": "list_files_on_integration",
+            "description": "List files on cloud integration (AWS S3, Wasabi, IBM Cloud)"
+        },
+        {
+            "name": "list_files_on_storage_gateway",
+            "description": "List files on MASV Storage Gateway integration"
+        },
+        {
+            "name": "transfer_files_from_integration",
+            "description": "Transfer files from integration to MASV"
+        },
+        {
+            "name": "get_portals",
+            "description": "Get list of portals for collecting files from external users"
+        },
+        {
+            "name": "get_portal",
+            "description": "Get a specific portal by ID"
+        },
+        {
+            "name": "create_portal",
+            "description": "Create a new portal for collecting files"
+        },
+        {
+            "name": "update_portal",
+            "description": "Update an existing portal's configuration"
+        },
+        {
+            "name": "delete_portal",
+            "description": "Delete a portal by ID (requires MASV_ALLOW_DELETE=true)"
+        },
+        {
+            "name": "get_team_members",
+            "description": "Get list of all team members"
+        }
+    ],
+    "compatibility": {
+        "platforms": [
+            "darwin",
+            "win32",
+            "linux"
+        ],
+        "runtimes": {
+            "node": ">=20.0.0"
+        }
+    }
+}

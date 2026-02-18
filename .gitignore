@@ -2,3 +2,5 @@ node_modules/
 build/
 local/
 .kiro/
+*.mcpb
+.DS_Store
