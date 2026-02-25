@@ -240,7 +240,16 @@ async function listFilesOnIntegration({
   cursor,
 }: ListFilesOnIntegrationParams) {
   const integration = await getIntegration(integrationId);
-  const isStorageGateway = integration.provider === "storage_gateway";
+  const STORAGE_GATEWAY_PROVIDERS = new Set([
+    "storage_gateway",
+    "jellyfish_sg",
+    "synology_sg",
+    "qnap_sg",
+    "amazon_efs_sg",
+    "opendrives_sg",
+    "desktop_sg",
+  ]);
+  const isStorageGateway = STORAGE_GATEWAY_PROVIDERS.has(integration.provider);
 
   const headers = {
     "content-type": "application/json",
