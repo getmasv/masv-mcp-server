@@ -1,0 +1,27 @@
+# Source files (only include built files)
+src/
+tsconfig.json
+
+# Development files
+*.test.js
+*.test.ts
+coverage/
+
+# Documentation
+README.md
+LICENSE
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.*

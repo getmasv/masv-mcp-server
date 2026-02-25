@@ -1,0 +1,39 @@
+{
+    "name": "masv-mcp-server",
+    "version": "0.0.1",
+    "description": "MASV MCP server provides LLMs with tools to control MASV API",
+    "keywords": [
+        "masv",
+        "massive",
+        "file",
+        "transfer",
+        "mcp",
+        "llm",
+        "ai"
+    ],
+    "license": "MIT",
+    "author": "Vladyslav Ilchenko",
+    "type": "module",
+    "bin": {
+        "masv-mcp-server": "./build/index.js"
+    },
+    "mcpName": "",
+    "scripts": {
+        "build": "tsc && chmod 755 build/index.js",
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "inspector": "npx @modelcontextprotocol/inspector node ./build/index.js",
+        "bundle": "npm run build && npx @anthropic-ai/mcpb pack . masv-mcp-server.mcpb"
+    },
+    "files": [
+        "build"
+    ],
+    "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.26.0",
+        "zod": "^4.3.6"
+    },
+    "devDependencies": {
+        "@anthropic-ai/mcpb": "^2.1.2",
+        "@types/node": "^25.2.3",
+        "typescript": "^5.9.3"
+    }
+}
