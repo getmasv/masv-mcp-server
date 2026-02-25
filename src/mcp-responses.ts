@@ -3,7 +3,7 @@ export function mcpOk(data: object | string) {
     content: [
       {
         type: "text" as const,
-        text: JSON.stringify(data, null, 2),
+        text: typeof data === "string" ? data : JSON.stringify(data, null, 2),
       },
     ],
   };
