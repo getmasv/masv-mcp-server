@@ -300,7 +300,7 @@ async function listFilesOnIntegration({
       `${MASV_BASE_URL}/v1/cloud_connections/${integrationId}/files`,
     );
     if (path) url.searchParams.append("prefix", path);
-    if (last_file_path) url.searchParams.append("last_file_path", last_file_path);
+    if (last_file_path) url.searchParams.append("prev_key", last_file_path);
 
     // Request 1 more file to check if there are more files than we return
     url.searchParams.append("count", String(PAGE_SIZE + 1));
