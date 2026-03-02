@@ -28,8 +28,6 @@ import {
 } from "./api/activities.js";
 import {
   getIntegrations,
-  listFilesOnStorageGatewayIntegration,
-  ListFilesOnStorageGatewayIntegrationSchema,
   listFilesOnIntegration,
   ListFilesOnIntegrationSchema,
   sendPackageToIntegration,
@@ -62,7 +60,7 @@ if (!MASV_TEAM_ID || !MASV_API_KEY) throw new Error("Please set MASV_TEAM_ID and
 // Server instance
 const server = new McpServer({
   name: "masv-mcp-server",
-  version: "0.0.1",
+  version: "0.0.2",
 });
 
 // Tools
@@ -283,7 +281,7 @@ server.registerTool(
   "list_files_on_integration",
   {
     description:
-      "List files on cloud integration (AWS S3, Wasabi, IBM Cloud). For MASV Storage Gateway integrations use list_files_on_storage_gateway tool instead.",
+      "List files on any integration (cloud or MASV Storage Gateway). Supports pagination — if more results are available, a cursor is returned; pass it back in the next call to get the next page.",
     inputSchema: ListFilesOnIntegrationSchema.shape,
   },
   async (args) => {
@@ -298,28 +296,10 @@ server.registerTool(
 );
 
 server.registerTool(
-  "list_files_on_storage_gateway",
-  {
-    description:
-      "List files on MASV Storage Gateway integration.",
-    inputSchema: ListFilesOnStorageGatewayIntegrationSchema.shape,
-  },
-  async (args) => {
-    try {
-      const data = await listFilesOnStorageGatewayIntegration(args);
-
-      return mcpOk(data);
-    } catch (error) {
-      return mcpError(error);
-    }
-  },
-);
-
-server.registerTool(
   "transfer_files_from_integration",
   {
     description:
-      "Transfer files from a cloud integration (AWS S3, Azure, Dropbox, etc.) or MASV Storage Gateway to MASV. Creates a new package and initiates the transfer. Use list_files_on_integration or list_files_on_storage_gateway first to get file information including IDs.",
+      "Transfer files from a cloud integration (AWS S3, Azure, Dropbox, etc.) or MASV Storage Gateway to MASV. Creates a new package and initiates the transfer. Use list_files_on_integration first to get file information including IDs.",
     inputSchema: TransferFilesFromIntegrationSchema.shape,
   },
   async (args) => {

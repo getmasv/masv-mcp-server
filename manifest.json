@@ -2,7 +2,7 @@
     "manifest_version": "0.3",
     "name": "masv-mcp-server",
     "display_name": "MASV MCP Server",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "description": "MASV is an easy-to-use, secure, and ultra-reliable cloud-based and on-prem managed file transfer service for large file workflows.",
     "long_description": "The MASV MCP Server enables AI assistants to interact with the MASV API. It provides comprehensive tools for package management, portal operations, activity tracking, and integration with cloud storage services and MASV Storage Gateway. MASV is an easy-to-use and ultra-reliable managed file transfer service designed for teams of all sizes. It allows users to send and receive massive files without size limits, while ensuring data integrity and security through its robust cloud infrastructure that supports cloud, on-prem, and hybrid workflows.",
     "author": {
