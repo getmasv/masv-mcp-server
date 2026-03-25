@@ -1,6 +1,6 @@
 {
     "name": "masv-mcp-server",
-    "version": "0.0.2",
+    "version": "0.0.3",
     "description": "MASV MCP server provides LLMs with tools to control MASV API",
     "keywords": [
         "masv",
@@ -28,12 +28,12 @@
         "build"
     ],
     "dependencies": {
-        "@modelcontextprotocol/sdk": "^1.27.1",
-        "zod": "^4.3.6"
+        "@modelcontextprotocol/sdk": "1.27.1",
+        "zod": "4.3.6"
     },
     "devDependencies": {
-        "@anthropic-ai/mcpb": "^2.1.2",
-        "@types/node": "^25.3.0",
-        "typescript": "^5.9.3"
+        "@anthropic-ai/mcpb": "2.1.2",
+        "@types/node": "25.3.0",
+        "typescript": "5.9.3"
     }
 }
