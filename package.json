@@ -1,5 +1,5 @@
 {
-    "name": "masv-mcp-server",
+    "name": "@getmasv/masv-mcp-server",
     "version": "0.0.3",
     "description": "MASV MCP server provides LLMs with tools to control MASV API",
     "keywords": [

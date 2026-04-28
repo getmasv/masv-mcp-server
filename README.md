@@ -16,10 +16,10 @@ The server can be run directly with `npx` without installation, or installed glo
 
 ```bash
 # Run directly with npx (recommended)
-npx masv-mcp-server
+npx @getmasv/masv-mcp-server
 
 # Or install globally
-npm install -g masv-mcp-server
+npm install -g @getmasv/masv-mcp-server
 ```
 
 ## Configuration
@@ -44,7 +44,7 @@ Add the server to your MCP client configuration file:
   "mcpServers": {
     "masv": {
       "command": "npx",
-      "args": ["-y", "masv-mcp-server"],
+      "args": ["-y", "@getmasv/masv-mcp-server"],
       "env": {
         "MASV_TEAM_ID": "your-team-id",
         "MASV_API_KEY": "your-api-key"
