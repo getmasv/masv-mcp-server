@@ -17,7 +17,11 @@
     "bin": {
         "masv-mcp-server": "./build/index.js"
     },
-    "mcpName": "",
+    "mcpName": "io.github.getmasv/masv",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/getmasv/masv-mcp-server.git"
+    },
     "scripts": {
         "build": "tsc && chmod 755 build/index.js",
         "test": "echo \"Error: no test specified\" && exit 1",
