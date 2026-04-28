@@ -12,15 +12,18 @@
         "ai"
     ],
     "license": "MIT",
-    "author": "Vladyslav Ilchenko",
+    "author": "MASV (https://massive.io)",
     "type": "module",
     "bin": {
-        "masv-mcp-server": "./build/index.js"
+        "masv-mcp-server": "build/index.js"
     },
     "mcpName": "io.github.getmasv/masv",
     "repository": {
         "type": "git",
-        "url": "https://github.com/getmasv/masv-mcp-server.git"
+        "url": "git+https://github.com/getmasv/masv-mcp-server.git"
+    },
+    "publishConfig": {
+        "access": "public"
     },
     "scripts": {
         "build": "tsc && chmod 755 build/index.js",
