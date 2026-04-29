@@ -109,11 +109,7 @@
         },
         {
             "name": "list_files_on_integration",
-            "description": "List files on cloud integration (AWS S3, Wasabi, IBM Cloud)"
-        },
-        {
-            "name": "list_files_on_storage_gateway",
-            "description": "List files on MASV Storage Gateway integration"
+            "description": "List files on any integration (cloud or MASV Storage Gateway)"
         },
         {
             "name": "transfer_files_from_integration",
