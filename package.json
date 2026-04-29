@@ -1,6 +1,6 @@
 {
-    "name": "masv-mcp-server",
-    "version": "0.0.3",
+    "name": "@getmasv/masv-mcp-server",
+    "version": "0.0.4",
     "description": "MASV MCP server provides LLMs with tools to control MASV API",
     "keywords": [
         "masv",
@@ -12,12 +12,19 @@
         "ai"
     ],
     "license": "MIT",
-    "author": "Vladyslav Ilchenko",
+    "author": "MASV (https://massive.io)",
     "type": "module",
     "bin": {
-        "masv-mcp-server": "./build/index.js"
+        "masv-mcp-server": "build/index.js"
     },
-    "mcpName": "",
+    "mcpName": "io.github.getmasv/masv",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/getmasv/masv-mcp-server.git"
+    },
+    "publishConfig": {
+        "access": "public"
+    },
     "scripts": {
         "build": "tsc && chmod 755 build/index.js",
         "test": "echo \"Error: no test specified\" && exit 1",
