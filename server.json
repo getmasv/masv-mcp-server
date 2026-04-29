@@ -33,7 +33,7 @@
         {
           "name": "MASV_ALLOW_DELETE",
           "description": "Set to true to enable delete operations for packages and portals",
-          "format": "string",
+          "format": "boolean",
           "isRequired": false,
           "isSecret": false
         }
