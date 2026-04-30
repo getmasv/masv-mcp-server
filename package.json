@@ -1,7 +1,7 @@
 {
     "name": "@getmasv/masv-mcp-server",
-    "version": "0.0.4",
-    "description": "MASV MCP server provides LLMs with tools to control MASV API",
+    "version": "0.0.5",
+    "description": "MCP server for MASV. Provides tools to use MASV API. MASV is an easy-to-use, secure, and ultra-reliable cloud-based and on-prem managed file transfer service for large file workflows.",
     "keywords": [
         "masv",
         "massive",
