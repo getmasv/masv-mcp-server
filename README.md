@@ -8,7 +8,7 @@ An MCP (Model Context Protocol) server that provides LLMs with tools to interact
 
 MASV is an easy-to-use and ultra-reliable managed file transfer service designed for teams of all sizes. It allows users to send and receive massive files without size limits, while ensuring data integrity and security through its robust cloud infrastructure that supports cloud, on-prem, and hybrid workflows.
 
-Learn more https://massive.io/
+Learn more https://masv.io/
 
 ## Installation
 
@@ -61,6 +61,7 @@ Add the server to your MCP client configuration file:
 The server provides the following tools for LLM interaction:
 
 ### Package Management
+
 - `get_packages` - List team packages
 - `get_package` - Get package details by ID
 - `get_portal_packages` - List packages uploaded to portals
@@ -70,6 +71,7 @@ The server provides the following tools for LLM interaction:
 - `delete_package` - Delete a package (requires `MASV_ALLOW_DELETE=true`)
 
 ### Portal Management
+
 - `get_portals` - List all portals
 - `get_portal` - Get portal details by ID
 - `create_portal` - Create a new portal
@@ -77,11 +79,13 @@ The server provides the following tools for LLM interaction:
 - `delete_portal` - Delete a portal (requires `MASV_ALLOW_DELETE=true`)
 
 ### Activity Tracking
+
 - `get_activities` - List activities and events
 - `get_activity_events` - Get event history for an activity
 - `get_activities_information` - Get detailed activity state descriptions
 
 ### Integration Management
+
 - `get_integrations` - List connected storage integrations
 - `send_package_to_integration` - Transfer package to connected storage
 - `list_files_on_integration` - Browse files on cloud integrations
@@ -89,8 +93,8 @@ The server provides the following tools for LLM interaction:
 - `transfer_files_from_integration` - Transfer files from storage to MASV (works with both cloud and MASV Storage Gateway)
 
 ### Team Management
-- `get_team_members` - List team members and their details
 
+- `get_team_members` - List team members and their details
 
 ## License
 
@@ -103,17 +107,21 @@ For questions, issues, or feedback please contact us at [support@masv.io](mailto
 ## Development
 
 ### Install dependencies
+
 ```
 npm install
 ```
 
 ### Build
+
 ```
 npm run build
 ```
 
 ### Use MCP server
+
 In LLM chat application add command to start the server:
+
 ```
 node /path/to/masv-mcp-server/build/index.js
 ```
