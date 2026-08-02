@@ -1,7 +1,13 @@
 node_modules/
 build/
 local/
-.kiro/
+
+# Kiro: publish engineering guidance only. Everything else under .kiro/ stays local,
+# including settings/ which can hold MCP credentials. Allowlist — new dirs are ignored by default.
+.kiro/*
+!.kiro/steering/
+!.kiro/agents/
+
 *.mcpb
 .DS_Store
 mcp-publisher
