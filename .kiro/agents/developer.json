@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json.schemastore.org/kiro-agent.json",
+  "name": "developer",
+  "description": "Developer agent for the MASV MCP Server (TypeScript / Node MCP server)",
+  "prompt": "Developer agent for the MASV MCP Server, a TypeScript MCP server exposing the MASV file-transfer API as tools for LLM clients. The steering files are authoritative — follow them over your own defaults.",
+  "tools": ["read", "write", "shell", "grep", "glob", "code"],
+  "allowedTools": ["read", "grep", "glob", "code"],
+  "toolsSettings": {
+    "write": {
+      "allowedPaths": [
+        "src/**",
+        "test/**",
+        "*.json",
+        "*.md",
+        "local/**",
+        ".kiro/**"
+      ],
+      "deniedPaths": ["node_modules/**", "build/**"]
+    },
+    "shell": {
+      "allowedCommands": [
+        "npm run build",
+        "npm run inspector",
+        "npm run bundle",
+        "npm test",
+        "npm install",
+        "npx tsc.*",
+        "node ./build/index.js"
+      ],
+      "autoAllowReadonly": true
+    }
+  },
+  "resources": ["file://.kiro/steering/**/*.md"]
+}
