@@ -11,6 +11,19 @@ coverage/
 README.md
 LICENSE
 
+# Internal notes & research — must never ship in the bundle
+local/
+
+# Kiro agent/steering config
+.kiro/
+
+# Packaging artifacts & local tooling binaries
+*.mcpb
+.mcpbignore
+.DS_Store
+mcp-publisher
+glama.json
+
 # Git
 .git/
 .gitignore
