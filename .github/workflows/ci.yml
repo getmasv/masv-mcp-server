@@ -1,0 +1,70 @@
+name: CI
+
+# Runs on every pull request, including from forks.
+#
+# `pull_request` — never `pull_request_target`. This workflow builds and runs repo
+# code, so it must run with the untrusted-code trust model: no secrets, read-only
+# token. `pull_request_target` would hand a fork PR full secrets and a write token.
+#
+# This workflow references NO secrets. That is deliberate and load-bearing: it is
+# what makes it safe to run a fork's code here, and it should stay true.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # Cancel superseded PR runs, but let pushes to main finish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here needs git write access. Not persisting the token keeps it
+          # out of .git/config, where any later step could reuse it.
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+
+      # No package in the lockfile declares an install script, so --ignore-scripts
+      # changes nothing today. It removes the ability for a future compromised
+      # dependency to execute code merely by being installed.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      # Runs first: the cheapest check, and the one whose failure is most
+      # confusing to diagnose later in a release.
+      - name: Check version and identity consistency
+        run: bash scripts/check-versions.sh
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      # The point of this job. scripts/bundle.sh stages an explicit allowlist and
+      # exits non-zero if local/, .kiro/, .env, .git/ or mcp-publisher appear in the
+      # artifact, so the leaked files becomes a
+      # failing build rather than something a human has to notice.
+      #
+      # Also runs `npm run build` internally, so no separate build step is needed.
+      - name: Bundle and verify contents
+        run: npm run bundle
+
+      # Lets a reviewer inspect exactly what this PR would ship.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mcpb-${{ github.sha }}
+          path: masv-mcp-server.mcpb
+          if-no-files-found: error
+          retention-days: 14
