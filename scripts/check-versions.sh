@@ -11,7 +11,7 @@
 #   bash scripts/check-versions.sh                 # consistency only
 #   bash scripts/check-versions.sh --tag 0.0.6     # also assert the tag matches
 #
-# JSON is read with `node -p` rather than `jq` so this behaves identically on a
+# JSON is read with `node -e` rather than `jq` so this behaves identically on a
 # bare CI runner and on a developer machine with nothing installed.
 #
 set -euo pipefail
