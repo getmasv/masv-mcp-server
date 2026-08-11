@@ -50,9 +50,19 @@ if [ ! -f "$BUNDLE" ]; then
     } >&2
     exit 1
   fi
-elif [ -n "$(find build -type f -newer "$BUNDLE" -print -quit 2>/dev/null)" ]; then
+elif [ -z "${GITHUB_ACTIONS:-}" ] &&
+     [ -n "$(find build -type f -newer "$BUNDLE" -print -quit 2>/dev/null)" ]; then
   # A bundle older than the compiled output means someone changed code and
   # forgot to repack — exactly the stale-release mistake worth blocking.
+  #
+  # Local-only by design. In CI this heuristic cannot produce a true positive: the
+  # bundle is an immutable artifact of this same workflow run, downloaded by artifact
+  # ID, so it cannot be a leftover from an earlier run. The release job then has to
+  # run `npm ci && npm run build` — scripts/smithery-payload.mjs spawns the built
+  # server to read tools/list — which leaves build/ newer than the downloaded file and
+  # would trip this every time. Every CI trigger would be a false positive.
+  #
+  # The existence check above still applies everywhere.
   {
     echo "ERROR: $BUNDLE is older than files in build/ — it is stale."
     echo "       Rebuild it:  npm run bundle"
