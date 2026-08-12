@@ -1,0 +1,30 @@
+version: 2
+
+updates:
+  # Keeps the SHA-pinned actions in .github/workflows/ current. Pinning without this
+  # just means the pins rot: Dependabot rewrites both the SHA and the trailing
+  # `# vX.Y.Z` comment, so the human-readable half stays accurate.
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: monthly
+
+    # `interval` only controls how often Dependabot looks; it would still propose a
+    # release published yesterday. `cooldown` is the minimum age since release, which
+    # is the actual soak policy: give a new version time for a compromise to surface.
+    #
+    # GitHub applies a 3-day default even with no config. 21 days is deliberate.
+    # Security updates are exempt from cooldown, so a CVE fix is not delayed.
+    cooldown:
+      default-days: 21
+
+    # One PR for all actions rather than one per action.
+    groups:
+      actions:
+        patterns: ['*']
+
+# The npm ecosystem is deliberately not enabled yet — deferred to Batch 4, where it can
+# be weighed against review load. Note dependabot-core #14579: the cooldown filter only
+# evaluates the latest release, so for a fast-releasing dependency whose newest version
+# is always inside the window, Dependabot proposes nothing rather than falling back to
+# an older eligible version. Harmless for github-actions; relevant for npm.

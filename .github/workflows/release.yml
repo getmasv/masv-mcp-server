@@ -1,32 +1,255 @@
 name: Release
 
+# Publishes to npm, the MCP Registry, Smithery and GitHub Releases from one tag push.
+#
+# IMPORTANT: this file must not be renamed and the `npm publish` step must not move
+# into a reusable workflow. npm's trusted publishing binds to the *workflow filename*,
+# and with `workflow_call` npm validates the calling workflow's name instead.
+#
+# Split into separate jobs on purpose. npm versions and MCP Registry versions are both
+# immutable, so a repeat publish fails rather than overwriting. With one job per leg,
+# GitHub's "Re-run failed jobs" retries only the leg that failed — `npm-publish` does
+# not re-run. Pushing a new version tag remains the fallback.
 on:
   push:
-    tags:
-      - '*'
+    # Narrowed from '*': a stray tag like `wip` used to start a publish.
+    tags: ["[0-9]*.[0-9]*.[0-9]*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  # Never cancel a release mid-publish.
+  cancel-in-progress: false
 
 jobs:
-  release:
+  # ---------------------------------------------------------------------------
+  # Everything verifiable and reversible happens here, before anything ships.
+  # No environment, no secrets, no OIDC.
+  # ---------------------------------------------------------------------------
+  build:
+    name: build
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
+    # Redundant given the trigger, but cheap. Gating the root job means a skip here
+    # skips the whole graph. Not a security control: it lives in the tagged tree.
+    if: startsWith(github.ref, 'refs/tags/')
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
     steps:
-      - uses: actions/checkout@v4.3.1
-
-      - uses: actions/setup-node@v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: '24'
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
-      - name: Bundle
+      # Before any publish. npm versions are immutable and the MCP Registry rejects a
+      # version that disagrees with npm, so a mismatch caught after publishing would
+      # burn a version number.
+      - name: Check version and identity consistency, and that the tag matches
+        run: bash scripts/check-versions.sh --tag "$GITHUB_REF_NAME"
+
+      # Catches the realistic mistake: tagging a commit that never reached main.
+      #
+      # NOT a security control — this check lives in release.yml at the tagged commit,
+      # so anyone who can craft that commit can delete it. The real restriction on who
+      # may start a release is the tag-creation ruleset (admins only).
+      - name: Verify the tagged commit is on main
+        run: |
+          git fetch --quiet origin +refs/heads/main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "ERROR: $GITHUB_SHA is not an ancestor of origin/main." >&2
+            echo "       Releases must be cut from a commit that has been merged to main." >&2
+            exit 1
+          fi
+          echo "OK  $GITHUB_SHA is on main"
+
+      # The leak guard: scripts/bundle.sh stages an explicit allowlist and exits
+      # non-zero if local/, .kiro/, .env, .git/ or mcp-publisher appear in the archive.
+      - name: Bundle and verify contents
         run: npm run bundle
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2.5.0
+      # Built exactly once. Both `smithery` and `github-release` consume this same
+      # artifact, so the bytes Smithery serves and the bytes attached to the GitHub
+      # release are identical, and the leak guard ran once over both.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        id: upload
         with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
-          files: masv-mcp-server.mcpb
+          name: mcpb-${{ github.ref_name }}
+          path: masv-mcp-server.mcpb
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # npm — OIDC trusted publishing. No NPM_TOKEN anywhere.
+  # ---------------------------------------------------------------------------
+  npm-publish:
+    name: npm
+    needs: build
+    runs-on: ubuntu-latest
+    # The environment is the security boundary: its policy allows only release-tag
+    # refs, and the resulting OIDC token carries an `environment: release` claim that
+    # npm's trusted publisher config requires. Without it, trust would bind only to a
+    # workflow filename on any branch — the TanStack failure mode.
+    environment: release
+    permissions:
+      contents: read
+      id-token: write # mints the OIDC token npm verifies
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # registry-url is required for the tokenless flow. `always-auth` is deliberately
+      # absent: it was removed in setup-node v6.1.0 and no longer exists.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24" # bundles npm 11.17+, above the 11.5.1 floor for OIDC
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      # build/ is gitignored, and package.json `files` ships only build/.
+      - name: Build
+        run: npm run build
+
+      # Logs exactly what would ship, so the release record shows the tarball contents.
+      - name: Show package contents
+        run: npm pack --dry-run
+
+      # Provenance is generated automatically for trusted publishing from a public repo
+      # publishing a public package, so --provenance is unnecessary.
+      - name: Publish to npm
+        run: npm publish
+
+  # ---------------------------------------------------------------------------
+  # MCP Registry — GitHub OIDC. Needs the npm package to already exist.
+  # ---------------------------------------------------------------------------
+  mcp-registry:
+    name: mcp-registry
+    needs: [build, npm-publish]
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Pinned and checksummed rather than the documented
+      # `releases/latest/download/...`, which is an unpinned binary fetch into a job
+      # that can publish under our namespace.
+      #
+      # Accepted trade-off: the registry's own troubleshooting says an "invalid
+      # audience" error means the binary is too old, so a registry-side change will
+      # eventually break releases until someone bumps this pin. A visible, reviewable
+      # failure beats executing whatever happens to sit behind `latest`.
+      - name: Install mcp-publisher (pinned, checksum verified)
+        env:
+          MCP_PUBLISHER_VERSION: v1.8.1
+          MCP_PUBLISHER_SHA256: a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
+        run: |
+          set -euo pipefail
+          # The pinned checksum is for linux_amd64. Fail loudly if the runner changes.
+          if [ "$(uname -s)" != "Linux" ] || [ "$(uname -m)" != "x86_64" ]; then
+            echo "ERROR: expected Linux/x86_64, got $(uname -s)/$(uname -m)." >&2
+            echo "       The pinned checksum no longer applies. Update it deliberately." >&2
+            exit 1
+          fi
+          url="https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz"
+          curl -fsSL -o mcp-publisher.tar.gz "$url"
+          echo "${MCP_PUBLISHER_SHA256}  mcp-publisher.tar.gz" | sha256sum -c -
+          tar xzf mcp-publisher.tar.gz mcp-publisher
+          rm -f mcp-publisher.tar.gz
+          chmod +x mcp-publisher
+
+      # Namespace io.github.getmasv/* is granted from the token's repository_owner
+      # claim. A fork cannot reach it: its owner claim is its own account.
+      - name: Authenticate to the MCP Registry
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish to the MCP Registry
+        run: ./mcp-publisher publish
+
+  # ---------------------------------------------------------------------------
+  # Smithery — the pipeline's only long-lived secret.
+  # ---------------------------------------------------------------------------
+  smithery:
+    name: smithery
+    needs: [build, npm-publish]
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      # scripts/smithery-payload.mjs spawns the built server and reads tools/list, so
+      # the published tool list cannot drift from the code. This is what fixes the live
+      # listing advertising get_packages with no parameters.
+      - name: Build
+        run: npm run build
+
+      # By artifact ID, not name: IDs are immutable, so this is provably the archive
+      # the build job produced rather than whatever currently answers to that name.
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact-id }}
+          path: .
+          merge-multiple: true
+
+      - name: Publish to Smithery
+        env:
+          SMITHERY_API_KEY: ${{ secrets.SMITHERY_API_KEY }}
+        run: bash scripts/smithery-publish.sh
+
+  # ---------------------------------------------------------------------------
+  # GitHub Release — last, because it is the only leg that can be freely deleted
+  # and recreated if something needs fixing.
+  # ---------------------------------------------------------------------------
+  github-release:
+    name: github-release
+    needs: [build, npm-publish]
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write # create the release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact-id }}
+          path: .
+          merge-multiple: true
+
+      # `gh` is preinstalled on ubuntu-latest, so this needs no third-party action.
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" masv-mcp-server.mcpb \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes
