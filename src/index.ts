@@ -47,20 +47,19 @@ import {
   DeletePortalSchema,
   deletePortal,
 } from "./api/portals.js";
-import {
-  GetTeamMembersSchema,
-  getTeamMembers,
-} from "./api/users.js";
+import { GetTeamMembersSchema, getTeamMembers } from "./api/users.js";
 import { MASV_TEAM_ID, MASV_API_KEY } from "./api/env.js";
 
 // Check required variables
-if (!MASV_TEAM_ID || !MASV_API_KEY) throw new Error("Please set MASV_TEAM_ID and MASV_API_KEY variables in MCP server config or environment variables.")
-
+if (!MASV_TEAM_ID || !MASV_API_KEY)
+  throw new Error(
+    "Please set MASV_TEAM_ID and MASV_API_KEY variables in MCP server config or environment variables.",
+  );
 
 // Server instance
 const server = new McpServer({
   name: "masv-mcp-server",
-  version: "0.0.5",
+  version: "0.0.6",
 });
 
 // Tools
