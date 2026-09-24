@@ -136,6 +136,7 @@ Prettier with a 100 column width. CI runs `npm run format:check` and fails on un
 
 ```
 npm test
+npm run test:coverage
 ```
 
 Runs the offline suite with Node's built-in test runner. It needs no MASV credentials

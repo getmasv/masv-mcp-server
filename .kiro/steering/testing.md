@@ -10,8 +10,25 @@ npm run build && npm test     # offline suite. no credentials, no network
 
 Build first: some tests spawn `build/index.js`. Run `npm test` before declaring work done.
 
-For a "what did I forget" pass: `node --test --experimental-test-coverage --import ./test/setup.ts
-'test/{unit,tools}/**/*.test.ts'`. There is no coverage gate and should not be one.
+```bash
+npm run test:coverage         # same suite, plus a per-file report for src/
+```
+
+Coverage is a "what did I forget" pass, not a target. **There is no coverage gate in CI and should not be
+one** — a number says nothing about whether the cases you wrote were the right ones. Read the uncovered
+lines and decide whether each is a case you forgot or code nobody needs.
+
+Two details in that command worth knowing, since both were needed to make the report mean anything:
+
+- `--test-coverage-include='src/**'` scopes it to production code. Without it the report also covers the
+  test files, and more confusingly `build/`: `test/tools/surface.test.ts` spawns `build/index.js`, the child
+  process inherits coverage collection, and the compiled output then double-counts against `src/` and drags
+  the totals down. That is why an unscoped run reports ~75% while every `src/` file is at 100%.
+- `--experimental-test-coverage` is Stability 1, so the flag name and the report format are exempt from
+  semver and a Node bump can change them. Fine for a local tool; another reason not to gate on it.
+
+Node can enforce thresholds with `--test-coverage-lines`, `--test-coverage-branches` and
+`--test-coverage-functions`. Deliberately unused.
 
 ## Where a test goes
 
