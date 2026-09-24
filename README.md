@@ -88,8 +88,7 @@ The server provides the following tools for LLM interaction:
 
 - `get_integrations` - List connected storage integrations
 - `send_package_to_integration` - Transfer package to connected storage
-- `list_files_on_integration` - Browse files on cloud integrations
-- `list_files_on_storage_gateway` - Browse files on Storage Gateway
+- `list_files_on_integration` - Browse files on cloud integrations and MASV Storage Gateway
 - `transfer_files_from_integration` - Transfer files from storage to MASV (works with both cloud and MASV Storage Gateway)
 
 ### Team Management

@@ -128,7 +128,14 @@ It will fail unless the new tool has:
 
 1. `title`, an explicit `readOnlyHint`, and an explicit `destructiveHint` whenever `readOnlyHint` is
    `false`. See `tool-design.md`.
-2. Its name in `manifest.json` and in the README's tool list.
+2. Its name in `manifest.json`.
+
+Annotations live only in `src/index.ts`. The MCPB manifest schema allows just `name` and `description`
+per tool (`additionalProperties: false`), so adding `title` or `annotations` to `manifest.json` fails
+`mcpb validate` and breaks `npm run bundle`. Parity is asserted on names only.
+
+Also add the tool to the README list — that one is not tested. Asserting on prose was tried and removed:
+the parse is brittle and the stakes are low, since models read the server's `tools/list`, not the README.
 
 ## Credentials and CI
 

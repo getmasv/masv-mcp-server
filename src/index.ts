@@ -67,9 +67,11 @@ const server = new McpServer({
 server.registerTool(
   "get_packages",
   {
+    title: "List team packages",
     description:
       "Get team packages. These are packages sent by MASV team users directly to MASV. It does not include packages sent to Portals. To get full list of packages you need to get both team packages and portal packages",
     inputSchema: GetPackagesSchema.shape,
+    annotations: { readOnlyHint: true },
   },
   async (args) => {
     try {
@@ -85,8 +87,10 @@ server.registerTool(
 server.registerTool(
   "get_package",
   {
+    title: "Get package details",
     description: "Get package by id",
     inputSchema: GetPackageSchema.shape,
+    annotations: { readOnlyHint: true },
   },
   async (args) => {
     try {
@@ -102,9 +106,11 @@ server.registerTool(
 server.registerTool(
   "get_portal_packages",
   {
+    title: "List packages received through portals",
     description:
       "Get portal packages. These are packages uploaded by anyone to MASV Portals. Only packages that were uploaded to Portals returned by this tool. To get full list of packages you need to get both team packages and portal packages.",
     inputSchema: GetPortalPackagesSchema.shape,
+    annotations: { readOnlyHint: true },
   },
   async (args) => {
     try {
@@ -120,8 +126,10 @@ server.registerTool(
 server.registerTool(
   "get_package_files",
   {
+    title: "List files in a package",
     description: "Get list of package files",
     inputSchema: GetPackageFilesSchema.shape,
+    annotations: { readOnlyHint: true },
   },
   async (args) => {
     try {
@@ -137,9 +145,11 @@ server.registerTool(
 server.registerTool(
   "get_package_transfers",
   {
+    title: "List package deliveries to storage",
     description:
       "Get all transfers of a package to storage. Transfer is a package delivery via MASV to cloud or on-premise (via MASV Storage Gateway) destination",
     inputSchema: GetPackageTransfersSchema.shape,
+    annotations: { readOnlyHint: true },
   },
   async (args) => {
     try {
@@ -155,9 +165,17 @@ server.registerTool(
 server.registerTool(
   "update_package_expiration_date_and_time",
   {
+    title: "Change when a package expires",
     description:
       "Update package expiration date and time. Also allows enable or disable unlimited storage. Additional package storage may incur charges, depending on your team subscription plan. Once expired the package and all of its files are deleted and can not be restored.",
     inputSchema: UpdatePackageExpiryDateSchema.shape,
+    // Overwrites existing expiry, and bringing it forward causes the package and
+    // its files to be deleted at that time. Not an additive update.
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+    },
   },
   async (args) => {
     try {
@@ -173,9 +191,15 @@ server.registerTool(
 server.registerTool(
   "delete_package",
   {
+    title: "Delete a package",
     description:
       "Delete a package by ID. This permanently removes the package and all its files and cannot be undone. Requires MASV_ALLOW_DELETE=true environment variable to be set.",
     inputSchema: DeletePackageSchema.shape,
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+    },
   },
   async (args) => {
     try {
@@ -191,9 +215,11 @@ server.registerTool(
 server.registerTool(
   "get_activities",
   {
+    title: "List activity history",
     description:
       "Get activities. Activities are records of events that happened with MASV resources like packages, links and transfers. Each activity has assosiated events and can be in one of several states: pending, started, complete, cancelled, error. Full list of activity types: package_upload_to_masv (package upload from user or connected storage integration to MASV), package_download_from_masv (user downloads package), link_generation (new download link is added to the package), package_transfer_masv_to_cloud (package transfer from MASV to connected storage integration)",
     inputSchema: GetActivitiesSchema.shape,
+    annotations: { readOnlyHint: true },
   },
   async (args) => {
     try {
@@ -209,9 +235,11 @@ server.registerTool(
 server.registerTool(
   "get_activity_events",
   {
+    title: "Get an activity's event history",
     description:
       "Get history of events for given activity. Activity gets event record every time it transitions to a new state. It is very useful to get events history to get more information about activity because it can transition states several times and activity only keeps track of its current state.",
     inputSchema: GetActivityEventsSchema.shape,
+    annotations: { readOnlyHint: true },
   },
   async (args) => {
     try {
@@ -227,8 +255,11 @@ server.registerTool(
 server.registerTool(
   "get_activities_information",
   {
+    title: "Explain MASV activities and states",
     description:
       "Get detailed information about all existing activities and their accurate states description. Always use this tool provide users with detailed explanation about activities and their states.",
+    // Returns static reference text. No request leaves the process.
+    annotations: { readOnlyHint: true, openWorldHint: false },
   },
   async () => {
     try {
@@ -244,8 +275,10 @@ server.registerTool(
 server.registerTool(
   "get_integrations",
   {
+    title: "List connected storage",
     description:
       "Get list of connected integrations. Integration could be cloud or on-prem system like AWS S3, Frame.io, Dropbox, MASV Storage Gateway and many others",
+    annotations: { readOnlyHint: true },
   },
   async () => {
     try {
@@ -261,9 +294,13 @@ server.registerTool(
 server.registerTool(
   "send_package_to_integration",
   {
+    title: "Deliver a package to storage",
     description:
       "Send MASV package to connected integration. Integration could be cloud or on-prem system like AWS S3, Frame.io, Dropbox, MASV Storage Gateway and many others",
     inputSchema: SendPackageToIntegrationSchema.shape,
+    // Starts a transfer: writes new files at the destination, removes nothing.
+    // Costs bandwidth, which is not what destructiveHint means.
+    annotations: { readOnlyHint: false, destructiveHint: false },
   },
   async (args) => {
     try {
@@ -279,9 +316,11 @@ server.registerTool(
 server.registerTool(
   "list_files_on_integration",
   {
+    title: "Browse files in connected storage",
     description:
       "List files on any integration (cloud or MASV Storage Gateway). Supports pagination — if more results are available, a cursor is returned; pass it back in the next call to get the next page.",
     inputSchema: ListFilesOnIntegrationSchema.shape,
+    annotations: { readOnlyHint: true },
   },
   async (args) => {
     try {
@@ -297,9 +336,12 @@ server.registerTool(
 server.registerTool(
   "transfer_files_from_integration",
   {
+    title: "Create a package from files in storage",
     description:
       "Transfer files from a cloud integration (AWS S3, Azure, Dropbox, etc.) or MASV Storage Gateway to MASV. Creates a new package and initiates the transfer. Use list_files_on_integration first to get file information including IDs.",
     inputSchema: TransferFilesFromIntegrationSchema.shape,
+    // Creates a new package each call, so not idempotent, but destroys nothing.
+    annotations: { readOnlyHint: false, destructiveHint: false },
   },
   async (args) => {
     try {
@@ -315,9 +357,11 @@ server.registerTool(
 server.registerTool(
   "get_portals",
   {
+    title: "List portals",
     description:
       "Get list of portals that belong to the team. Portals are used to collect files from external users. Each portal has a unique subdomain and can be configured with various settings like upload and download password, file type restrictions, connected integrations, metadata forms, etc.",
     inputSchema: GetPortalsSchema.shape,
+    annotations: { readOnlyHint: true },
   },
   async (args) => {
     try {
@@ -333,9 +377,11 @@ server.registerTool(
 server.registerTool(
   "get_portal",
   {
+    title: "Get portal details",
     description:
       "Get a specific portal by ID. Returns detailed information about the portal including its configuration, recipients, connected integrations, and settings.",
     inputSchema: GetPortalSchema.shape,
+    annotations: { readOnlyHint: true },
   },
   async (args) => {
     try {
@@ -351,9 +397,11 @@ server.registerTool(
 server.registerTool(
   "create_portal",
   {
+    title: "Create a portal to collect files",
     description:
       "Create a new portal for collecting files from external users. Portals can be configured with access codes, download passwords, file type restrictions, custom branding, connected integrations, and more. Only 'name' and 'subdomain' are required - all other settings are optional.",
     inputSchema: CreatePortalSchema.shape,
+    annotations: { readOnlyHint: false, destructiveHint: false },
   },
   async (args) => {
     try {
@@ -369,9 +417,18 @@ server.registerTool(
 server.registerTool(
   "update_portal",
   {
+    title: "Update a portal",
     description:
       "Update an existing portal's configuration. Use this to modify portal settings like access controls, branding, file restrictions, and more.",
     inputSchema: UpdatePortalSchema.shape,
+    // Overwrites live portal configuration, so not an additive update. name and
+    // subdomain are required on every call, so changing one setting means restating
+    // the portal's identity, and a wrong restatement overwrites it.
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+    },
   },
   async (args) => {
     try {
@@ -387,9 +444,15 @@ server.registerTool(
 server.registerTool(
   "delete_portal",
   {
+    title: "Delete a portal",
     description:
       "Delete a portal by ID. This permanently removes the portal and cannot be undone. Packages that were uploaded to this portal will remain accessible. Requires MASV_ALLOW_DELETE=true environment variable to be set.",
     inputSchema: DeletePortalSchema.shape,
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+    },
   },
   async (args) => {
     try {
@@ -405,9 +468,11 @@ server.registerTool(
 server.registerTool(
   "get_team_members",
   {
+    title: "List team members",
     description:
       "Get list of all team members. Returns member details including id (membership_id), email, name, policy, approval status, and teamspaces. Use this to get membership IDs needed for portal access_list when creating private portals.",
     inputSchema: GetTeamMembersSchema.shape,
+    annotations: { readOnlyHint: true },
   },
   async (args) => {
     try {
