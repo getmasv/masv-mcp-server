@@ -1,7 +1,7 @@
-// masvFetch is the single place that decides whether a MASV response is a result or
-// an error. Before it existed, every module did `await r.json()` with no status
-// check, so a 401 whose body happened to be JSON was handed to the model as data,
-// and a 500 with an HTML body surfaced as "Unexpected token '<'".
+// masvFetch is the single place that decides whether a MASV response is a
+// result or an error. These tests pin that decision: which statuses throw, what
+// the message carries, and what a caller gets back for a body that is empty or
+// not JSON.
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -46,7 +46,7 @@ describe("masvFetch", () => {
   });
 
   describe("error responses", () => {
-    it("throws on 4xx instead of returning the error body as data", async (t) => {
+    it("throws on 4xx, carrying the status and the API's message", async (t) => {
       t.mock.method(globalThis, "fetch", async () =>
         Response.json({ error: "invalid api key" }, { status: 401, statusText: "Unauthorized" }),
       );
@@ -92,7 +92,10 @@ describe("masvFetch", () => {
       );
 
       await assert.rejects(
-        () => masvFetch("https://api.test.invalid/v1/packages/bogus/files", { method: "GET" }),
+        () =>
+          masvFetch("https://api.test.invalid/v1/packages/bogus/files", {
+            method: "GET",
+          }),
         /GET .*\/v1\/packages\/bogus\/files/,
       );
     });

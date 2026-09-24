@@ -14,7 +14,7 @@ describe("getActivities", () => {
     assert.match(url, /[?&]limit=20(&|$)/, `limit missing from ${url}`);
   });
 
-  it("surfaces an API error instead of returning the error body as data", async (t) => {
+  it("returns an error for a 401", async (t) => {
     t.mock.method(globalThis, "fetch", async () =>
       Response.json({ error: "unauthorized" }, { status: 401 }),
     );
@@ -24,7 +24,7 @@ describe("getActivities", () => {
 });
 
 describe("getActivityEvents", () => {
-  it("surfaces an API error instead of returning the error body as data", async (t) => {
+  it("returns an error for a 404", async (t) => {
     t.mock.method(globalThis, "fetch", async () =>
       Response.json({ error: "no such activity" }, { status: 404 }),
     );

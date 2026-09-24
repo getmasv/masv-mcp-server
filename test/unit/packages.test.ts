@@ -14,8 +14,8 @@ function requestedUrl(f: ReturnType<typeof stubFetch>, call = 0) {
 
 describe("getPackages", () => {
   it("forwards page to the query string", async (t) => {
-    // `page` was accepted by the schema, destructured out of the params, and never
-    // used. An agent paginating with it silently re-read page 1 forever.
+    // A dropped `page` makes an agent re-read page 1 forever, with no error to
+    // notice, so every paginated endpoint pins it.
     const f = stubFetch(t, { packages: [] });
 
     await getPackages({ page: 3, limit: 10 });
@@ -33,9 +33,8 @@ describe("getPackages", () => {
     assert.doesNotMatch(requestedUrl(f), /page=/);
   });
 
-  it("surfaces an API error instead of returning the error body as data", async (t) => {
-    // A 401 body is JSON, so without a status check it reached the model as a
-    // successful result and the model reported it as data.
+  it("returns an error for a 401", async (t) => {
+    // The 401 body is JSON, so it would parse cleanly as a result. It must not.
     t.mock.method(globalThis, "fetch", async () =>
       Response.json({ error: "unauthorized" }, { status: 401 }),
     );
@@ -43,7 +42,7 @@ describe("getPackages", () => {
     await assert.rejects(() => getPackages({}), /401/);
   });
 
-  it("surfaces a 500 with an HTML body as an error naming the status", async (t) => {
+  it("returns an error naming the status for a 500 with an HTML body", async (t) => {
     t.mock.method(
       globalThis,
       "fetch",
@@ -76,7 +75,7 @@ describe("getPortalPackages", () => {
     assert.match(url, /[?&]limit=25(&|$)/, `limit missing from ${url}`);
   });
 
-  it("surfaces an API error instead of returning the error body as data", async (t) => {
+  it("returns an error for a 403", async (t) => {
     t.mock.method(globalThis, "fetch", async () =>
       Response.json({ error: "forbidden" }, { status: 403 }),
     );
