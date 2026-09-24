@@ -9,10 +9,16 @@ import { moduleUrl, runInChild } from "../helpers/child.ts";
 
 const ENV_MODULE = moduleUrl("src/api/env.ts");
 
-/** Imports env.ts with exactly the MASV_* vars given, optionally printing an export. */
+/**
+ * Imports env.ts with exactly the MASV_* vars given, optionally printing an export.
+ *
+ * The value is stringified in the child rather than logged raw: console.log formats a
+ * non-string through util.inspect, which would wrap a boolean in ANSI colour codes
+ * whenever colour is enabled.
+ */
 function importEnv(masvVars: Record<string, string>, print?: string) {
   const script = print
-    ? `const m = await import(${ENV_MODULE}); console.log(m.${print});`
+    ? `const m = await import(${ENV_MODULE}); console.log(String(m.${print}));`
     : `await import(${ENV_MODULE});`;
 
   return runInChild(script, masvVars);

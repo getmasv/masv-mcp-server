@@ -25,6 +25,15 @@ export function runInChild(script: string, masvEnv: Record<string, string> = {})
   for (const [key, value] of Object.entries(process.env)) {
     if (value !== undefined && !key.startsWith("MASV_")) env[key] = value;
   }
+
+  // Keep the child's output plain. console.log applies util.inspect formatting to
+  // anything that is not a string, so with colour enabled a boolean arrives wrapped
+  // in ANSI escapes and an assertion on "true" fails against "\x1B[33mtrue\x1B[39m".
+  // Colour is on whenever the parent has FORCE_COLOR set, which npm does from an
+  // interactive terminal — so without this a test passes in CI and fails locally.
+  env.NO_COLOR = "1";
+  env.FORCE_COLOR = "0";
+
   Object.assign(env, masvEnv);
 
   return spawnSync(process.execPath, ["--input-type=module", "-e", script], {

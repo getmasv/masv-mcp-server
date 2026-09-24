@@ -171,6 +171,13 @@ gate — needs a child process. `test/helpers/child.ts` provides one: it strips 
 from the parent and applies only what the test asks for, so nothing leaks in from the developer's shell.
 Stub `globalThis.fetch` inside the snippet before importing the module under test.
 
+**Make the child's output explicit.** Report values with `String(x)` or `JSON.stringify(x)`, never by
+logging them raw. `console.log` formats anything that is not a string through `util.inspect`, so a boolean
+comes back as `\x1B[33mtrue\x1B[39m` once colour is enabled — and colour is enabled whenever the parent has
+`FORCE_COLOR` set, which npm does from an interactive terminal but not from a pipe. A test that ignores
+this passes in CI and for anyone running it non-interactively, then fails on a real terminal.
+`child.ts` also sets `NO_COLOR` in the child as a second line of defence.
+
 ## Import specifiers: `.ts`, not `.js`
 
 **Relative imports in `src/` must use a `.ts` extension.** `tsc` rewrites them to `.js` on emit
