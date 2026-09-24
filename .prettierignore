@@ -1,0 +1,5 @@
+# Prettier also reads .gitignore, so build/, local/, node_modules/ and .kiro/settings/
+# are already excluded. Only additions belong here.
+
+# npm owns the formatting of the lockfile and rewrites it on every install.
+package-lock.json

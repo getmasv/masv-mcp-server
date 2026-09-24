@@ -118,6 +118,14 @@ npm install
 npm run build
 ```
 
+### Format
+
+```
+npm run format
+```
+
+Prettier with a 100 column width. CI runs `npm run format:check` and fails on unformatted files.
+
 ### Use MCP server
 
 In LLM chat application add command to start the server:

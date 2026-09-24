@@ -7,14 +7,7 @@
   "allowedTools": ["read", "grep", "glob", "code"],
   "toolsSettings": {
     "write": {
-      "allowedPaths": [
-        "src/**",
-        "test/**",
-        "*.json",
-        "*.md",
-        "local/**",
-        ".kiro/**"
-      ],
+      "allowedPaths": ["src/**", "test/**", "*.json", "*.md", "local/**", ".kiro/**"],
       "deniedPaths": ["node_modules/**", "build/**"]
     },
     "shell": {

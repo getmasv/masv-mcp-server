@@ -5,7 +5,7 @@ updates:
   # just means the pins rot: Dependabot rewrites both the SHA and the trailing
   # `# vX.Y.Z` comment, so the human-readable half stays accurate.
   - package-ecosystem: github-actions
-    directory: '/'
+    directory: "/"
     schedule:
       interval: monthly
 
@@ -21,7 +21,7 @@ updates:
     # One PR for all actions rather than one per action.
     groups:
       actions:
-        patterns: ['*']
+        patterns: ["*"]
 
 # The npm ecosystem is deliberately not enabled yet — deferred to Batch 4, where it can
 # be weighed against review load. Note dependabot-core #14579: the cooldown filter only
