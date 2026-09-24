@@ -1,8 +1,17 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "Node16",
-    "moduleResolution": "Node16",
+    // "nodenext" + .ts relative specifiers: source runs as-is under Node's type
+    // stripping (so `node --test` can import src/), and tsc rewrites the
+    // specifiers to .js on emit. See .kiro/steering/testing.md.
+    "target": "esnext",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    // Bans syntax Node cannot strip (enums, namespaces, parameter properties)
+    // and import forms that are ambiguous when types are erased.
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
     "outDir": "./build",
     "rootDir": "./src",
     "strict": true,
@@ -10,6 +19,9 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
+  // No "noEmit": build/index.js is the published bin.
+  // test/**/* is deliberately excluded — tsc would emit it into build/, which
+  // package.json publishes wholesale.
   "include": ["src/**/*"],
   "exclude": ["node_modules"]
 }

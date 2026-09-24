@@ -17,15 +17,15 @@ import {
   updatePackageExpiry,
   DeletePackageSchema,
   deletePackage,
-} from "./api/packages.js";
-import { mcpOk, mcpError } from "./mcp-responses.js";
+} from "./api/packages.ts";
+import { mcpOk, mcpError } from "./mcp-responses.ts";
 import {
   getActivities,
   getActivitiesInformation,
   GetActivitiesSchema,
   getActivityEvents,
   GetActivityEventsSchema,
-} from "./api/activities.js";
+} from "./api/activities.ts";
 import {
   getIntegrations,
   listFilesOnIntegration,
@@ -34,7 +34,7 @@ import {
   SendPackageToIntegrationSchema,
   transferFilesFromIntegration,
   TransferFilesFromIntegrationSchema,
-} from "./api/integrations.js";
+} from "./api/integrations.ts";
 import {
   GetPortalsSchema,
   getPortals,
@@ -46,9 +46,9 @@ import {
   updatePortal,
   DeletePortalSchema,
   deletePortal,
-} from "./api/portals.js";
-import { GetTeamMembersSchema, getTeamMembers } from "./api/users.js";
-import { MASV_TEAM_ID, MASV_API_KEY } from "./api/env.js";
+} from "./api/portals.ts";
+import { GetTeamMembersSchema, getTeamMembers } from "./api/users.ts";
+import { MASV_TEAM_ID, MASV_API_KEY } from "./api/env.ts";
 
 // Check required variables
 if (!MASV_TEAM_ID || !MASV_API_KEY)

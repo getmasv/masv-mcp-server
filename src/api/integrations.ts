@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { MASV_BASE_URL, MASV_TEAM_ID, MASV_API_KEY } from "./env.js";
-import { getPackageToken } from "./packages.js";
+import { MASV_BASE_URL, MASV_TEAM_ID, MASV_API_KEY } from "./env.ts";
+import { getPackageToken } from "./packages.ts";
 
 async function getIntegrations() {
   const url = new URL(`${MASV_BASE_URL}/v1/teams/${MASV_TEAM_ID}/cloud_connections`);

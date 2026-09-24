@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MASV_BASE_URL, MASV_TEAM_ID, MASV_API_KEY } from "./env.js";
+import { MASV_BASE_URL, MASV_TEAM_ID, MASV_API_KEY } from "./env.ts";
 
 const GetTeamMembersSchema = z.object({});
 

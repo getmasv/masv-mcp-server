@@ -5,11 +5,15 @@ npm and run with `npx`; a remote HTTP server is the goal (see `architecture.md`)
 
 ## Tech Stack
 
-- **Language:** TypeScript (strict mode, ES modules / `Node16` resolution)
+- **Language:** TypeScript (strict mode, ES modules / `nodenext` resolution)
 - **Runtime:** Node.js >= 24
 - **Key deps:** `@modelcontextprotocol/sdk`, `zod` (tool input schemas)
 - **Build:** `tsc` → `build/` (dev dep `@anthropic-ai/mcpb` for `.mcpb` bundles)
+- **Tests:** `node:test`, zero dependencies
 - **Formatting:** Prettier, `printWidth: 100`, everything else default
+- **Source runs unbuilt.** Relative imports in `src/` use `.ts` extensions so Node's type stripping can
+  run the sources directly; `tsc` rewrites them to `.js` on emit. `erasableSyntaxOnly` therefore bans
+  `enum`, `namespace`, and parameter properties. Details and rationale in `testing.md`.
 
 ## Layout
 
@@ -25,6 +29,9 @@ src/
     activities-info.md  Reference text returned by get_activities_information.
     integrations.ts   Storage integration + Storage Gateway tools.
     users.ts          Team member tools.
+test/
+  setup.ts            Dummy MASV_* env, loaded via --import before any test module.
+  unit/               Offline tests against src/, fetch stubbed at globalThis.
 build/                Compiled output (gitignored).
 scripts/              Build & publish scripts (bundle, Smithery release).
 ```
@@ -47,12 +54,12 @@ scripts/              Build & publish scripts (bundle, Smithery release).
 - `npm run build` — typecheck + compile. Run before declaring work done.
 - `npm run inspector` — launch MCP Inspector against the built server.
 - `npm run bundle` — build + pack `.mcpb`.
+- `npm test` — offline test suite, no credentials, no network. Build first; some tests spawn
+  `build/index.js`. Run it before declaring work done. See `testing.md`.
 - `npm run format` / `npm run format:check` — Prettier, `printWidth: 100`. CI fails on unformatted
   files. Run `format` before finishing a change; editors with format-on-save pick up
   `.prettierrc.json` automatically, and without a config they default to 80 columns and reflow whole
   files.
-- `npm test` is a stub. Tests and CI are wanted; when a runner is introduced, wire it into the
-  build/verify loop and run it before declaring work done.
 
 ## Doc Sync
 

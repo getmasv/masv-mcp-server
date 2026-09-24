@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MASV_BASE_URL, MASV_TEAM_ID, MASV_API_KEY, MASV_ALLOW_DELETE } from "./env.js";
+import { MASV_BASE_URL, MASV_TEAM_ID, MASV_API_KEY, MASV_ALLOW_DELETE } from "./env.ts";
 
 const GetPackagesSchema = z.object({
   page: z.number().min(1).describe("Page number of paginated response. First page is 1").optional(),
