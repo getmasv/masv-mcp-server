@@ -3,9 +3,7 @@ import { MASV_BASE_URL, MASV_TEAM_ID, MASV_API_KEY } from "./env.js";
 import { getPackageToken } from "./packages.js";
 
 async function getIntegrations() {
-  const url = new URL(
-    `${MASV_BASE_URL}/v1/teams/${MASV_TEAM_ID}/cloud_connections`,
-  );
+  const url = new URL(`${MASV_BASE_URL}/v1/teams/${MASV_TEAM_ID}/cloud_connections`);
 
   const headers = {
     "content-type": "application/json",
@@ -19,9 +17,7 @@ async function getIntegrations() {
 }
 
 async function getIntegration(integrationId: string) {
-  const url = new URL(
-    `${MASV_BASE_URL}/v1/cloud_connections/${integrationId}`,
-  );
+  const url = new URL(`${MASV_BASE_URL}/v1/cloud_connections/${integrationId}`);
 
   const headers = {
     "content-type": "application/json",
@@ -36,23 +32,20 @@ async function getIntegration(integrationId: string) {
   } else {
     throw new Error(JSON.stringify(data));
   }
-
 }
 
 const SendPackageToIntegrationSchema = z.object({
   packageId: z
     .string()
-    .describe(
-      "Id of the package that will be transferred to connected integration",
-    ),
+    .describe("Id of the package that will be transferred to connected integration"),
   integrationId: z
     .string()
-    .describe("Id of the integration to transfer package to. Integration should have direction: masv_to_cloud."),
+    .describe(
+      "Id of the integration to transfer package to. Integration should have direction: masv_to_cloud.",
+    ),
 });
 
-type SendPackageToIntegrationParams = z.infer<
-  typeof SendPackageToIntegrationSchema
->;
+type SendPackageToIntegrationParams = z.infer<typeof SendPackageToIntegrationSchema>;
 
 async function sendPackageToIntegration({
   packageId,
@@ -89,7 +82,10 @@ const TransferFileSchema = z.object({
 
 const TransferFilesFromIntegrationSchema = z.object({
   integrationId: z.string().describe("ID of the cloud or storage gateway integration"),
-  files: z.array(TransferFileSchema).min(1).describe("Array of files/directories to transfer from the integration"),
+  files: z
+    .array(TransferFileSchema)
+    .min(1)
+    .describe("Array of files/directories to transfer from the integration"),
   packageName: z.string().describe("Name for the new package"),
   packageDescription: z.string().optional().describe("Description for the package"),
   recipients: z.array(z.email()).optional().describe("Email addresses to send package to"),
@@ -97,9 +93,7 @@ const TransferFilesFromIntegrationSchema = z.object({
   accessLimit: z.number().optional().describe("Download access limit (default: 5)"),
 });
 
-type TransferFilesFromIntegrationParams = z.infer<
-  typeof TransferFilesFromIntegrationSchema
->;
+type TransferFilesFromIntegrationParams = z.infer<typeof TransferFilesFromIntegrationSchema>;
 
 async function transferFilesFromIntegration({
   integrationId,
@@ -115,9 +109,7 @@ async function transferFilesFromIntegration({
   const provider = integration.provider;
 
   // Step 2: Create package
-  const createPackageUrl = new URL(
-    `${MASV_BASE_URL}/v1/teams/${MASV_TEAM_ID}/packages`,
-  );
+  const createPackageUrl = new URL(`${MASV_BASE_URL}/v1/teams/${MASV_TEAM_ID}/packages`);
 
   const createPackageBody = {
     name: packageName,
@@ -147,9 +139,7 @@ async function transferFilesFromIntegration({
   const packageToken = packageData.access_token;
 
   // Step 3: Initiate transfer
-  const transferUrl = new URL(
-    `${MASV_BASE_URL}/v1/packages/${packageId}/transfer`,
-  );
+  const transferUrl = new URL(`${MASV_BASE_URL}/v1/packages/${packageId}/transfer`);
 
   const transferBody = {
     cloud_connection_id: integrationId,
@@ -179,7 +169,7 @@ async function transferFilesFromIntegration({
   // Step 4: Format response for LLM
   const fileCount = files.length;
 
-  const fileList = files.slice(0, 10).map(file => {
+  const fileList = files.slice(0, 10).map((file) => {
     if (file.kind === "directory") {
       return `[DIR] ${file.name}/`;
     } else {
@@ -229,7 +219,12 @@ const PAGE_SIZE = 50;
 const ListFilesOnIntegrationSchema = z.object({
   integrationId: z.string().describe("ID of the cloud or storage gateway integration"),
   path: z.string().optional().describe("Directory path/prefix to list files from"),
-  cursor: z.string().optional().describe("Pagination cursor returned from a previous call. Pass this to retrieve the next page of results."),
+  cursor: z
+    .string()
+    .optional()
+    .describe(
+      "Pagination cursor returned from a previous call. Pass this to retrieve the next page of results.",
+    ),
 });
 
 type ListFilesOnIntegrationParams = z.infer<typeof ListFilesOnIntegrationSchema>;
@@ -265,7 +260,8 @@ async function listFilesOnIntegration({
     let offset = 0;
     if (cursor) {
       const decoded = decodeCursor(cursor);
-      if (decoded.type !== "storage_gateway") throw new Error("Invalid cursor for this integration type");
+      if (decoded.type !== "storage_gateway")
+        throw new Error("Invalid cursor for this integration type");
       offset = decoded.offset;
     }
 
@@ -296,9 +292,7 @@ async function listFilesOnIntegration({
       last_file_path = decoded.last_file_path;
     }
 
-    const url = new URL(
-      `${MASV_BASE_URL}/v1/cloud_connections/${integrationId}/files`,
-    );
+    const url = new URL(`${MASV_BASE_URL}/v1/cloud_connections/${integrationId}/files`);
     if (path) url.searchParams.append("prefix", path);
     if (last_file_path) url.searchParams.append("prev_key", last_file_path);
 
@@ -365,7 +359,6 @@ function formatFileSize(bytes: number): string {
 
   return `${size.toFixed(2)} ${units[unitIndex]}`;
 }
-
 
 export {
   getIntegrations,

@@ -2,17 +2,8 @@ import { z } from "zod";
 import { MASV_BASE_URL, MASV_TEAM_ID, MASV_API_KEY } from "./env.js";
 
 const GetActivitiesSchema = z.object({
-  page: z
-    .number()
-    .min(1)
-    .describe("Page number of paginated response. First page is 1")
-    .optional(),
-  limit: z
-    .number()
-    .min(1)
-    .max(100)
-    .describe("Number of records returned per page")
-    .optional(),
+  page: z.number().min(1).describe("Page number of paginated response. First page is 1").optional(),
+  limit: z.number().min(1).max(100).describe("Number of records returned per page").optional(),
   sort: z
     .string()
     .describe("Sort results ascending (fieldname) or descending (-fieldname)")
@@ -52,9 +43,7 @@ const GetActivitiesSchema = z.object({
     .optional(),
   teamspaces: z
     .array(z.string())
-    .describe(
-      "Retrieve records where teamspace id is equal to one of these values",
-    )
+    .describe("Retrieve records where teamspace id is equal to one of these values")
     .optional(),
 });
 
@@ -90,9 +79,7 @@ const GetActivityEventsSchema = z.object({
 type GetActivityEventsParams = z.infer<typeof GetActivityEventsSchema>;
 
 async function getActivityEvents({ activityId }: GetActivityEventsParams) {
-  const url = new URL(
-    `${MASV_BASE_URL}/v1/teams/${MASV_TEAM_ID}/activities/${activityId}/events`,
-  );
+  const url = new URL(`${MASV_BASE_URL}/v1/teams/${MASV_TEAM_ID}/activities/${activityId}/events`);
 
   const headers = {
     "content-type": "application/json",

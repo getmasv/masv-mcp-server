@@ -2,17 +2,8 @@ import { z } from "zod";
 import { MASV_BASE_URL, MASV_TEAM_ID, MASV_API_KEY, MASV_ALLOW_DELETE } from "./env.js";
 
 const GetPackagesSchema = z.object({
-  page: z
-    .number()
-    .min(1)
-    .describe("Page number of paginated response. First page is 1")
-    .optional(),
-  limit: z
-    .number()
-    .min(1)
-    .max(100)
-    .describe("Number of records returned per page")
-    .optional(),
+  page: z.number().min(1).describe("Page number of paginated response. First page is 1").optional(),
+  limit: z.number().min(1).max(100).describe("Number of records returned per page").optional(),
   sort: z
     .string()
     .describe("Sort results ascending (fieldname) or descending (-fieldname)")
@@ -41,9 +32,7 @@ const GetPackagesSchema = z.object({
     .optional(),
   teamspaces: z
     .array(z.string())
-    .describe(
-      "Retrieve records where teamspace id is equal to one of these values",
-    )
+    .describe("Retrieve records where teamspace id is equal to one of these values")
     .optional(),
   expiry_start: z
     .string()
@@ -90,9 +79,7 @@ const GetPackageSchema = z.object({
 type GetPackageParams = z.infer<typeof GetPackageSchema>;
 
 async function getPackage({ packageId }: GetPackageParams) {
-  const url = new URL(
-    `${MASV_BASE_URL}/v1.1/teams/${MASV_TEAM_ID}/packages/${packageId}`,
-  );
+  const url = new URL(`${MASV_BASE_URL}/v1.1/teams/${MASV_TEAM_ID}/packages/${packageId}`);
 
   const headers = {
     "content-type": "application/json",
@@ -106,17 +93,8 @@ async function getPackage({ packageId }: GetPackageParams) {
 }
 
 const GetPortalPackagesSchema = z.object({
-  page: z
-    .number()
-    .min(1)
-    .describe("Page number of paginated response. First page is 1")
-    .optional(),
-  limit: z
-    .number()
-    .min(1)
-    .max(100)
-    .describe("Number of records returned per page")
-    .optional(),
+  page: z.number().min(1).describe("Page number of paginated response. First page is 1").optional(),
+  limit: z.number().min(1).max(100).describe("Number of records returned per page").optional(),
   sort: z
     .string()
     .describe("Sort results ascending (fieldname) or descending (-fieldname)")
@@ -149,9 +127,7 @@ const GetPortalPackagesSchema = z.object({
     .optional(),
   teamspaces: z
     .array(z.string())
-    .describe(
-      "Retrieve records where teamspace id is equal to one of these values",
-    )
+    .describe("Retrieve records where teamspace id is equal to one of these values")
     .optional(),
   expiry_start: z
     .string()
@@ -259,9 +235,7 @@ const UpdatePackageExpiryDateSchema = z.object({
     .optional(),
 });
 
-type UpdatePackageExpiryDateSchemaParams = z.infer<
-  typeof UpdatePackageExpiryDateSchema
->;
+type UpdatePackageExpiryDateSchemaParams = z.infer<typeof UpdatePackageExpiryDateSchema>;
 
 async function updatePackageExpiry({
   packageId,
@@ -291,9 +265,7 @@ async function updatePackageExpiry({
     };
   } else {
     if (!expiry)
-      throw new Error(
-        "expiry parameter must be provided if unlimited storage is disabled",
-      );
+      throw new Error("expiry parameter must be provided if unlimited storage is disabled");
 
     body = {
       unlimited_storage: false,
@@ -319,7 +291,9 @@ type DeletePackageParams = z.infer<typeof DeletePackageSchema>;
 
 async function deletePackage({ packageId }: DeletePackageParams) {
   if (!MASV_ALLOW_DELETE) {
-    throw new Error("Delete operations are not allowed. Set MASV_ALLOW_DELETE=true in environment variables to enable.");
+    throw new Error(
+      "Delete operations are not allowed. Set MASV_ALLOW_DELETE=true in environment variables to enable.",
+    );
   }
 
   const packageToken = await getPackageToken(packageId);

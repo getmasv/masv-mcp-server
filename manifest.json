@@ -8,17 +8,7 @@
   "author": {
     "name": "MASV (https://masv.io)"
   },
-  "keywords": [
-    "masv",
-    "massive",
-    "file",
-    "transfer",
-    "mcp",
-    "llm",
-    "ai",
-    "cloud-storage",
-    "api"
-  ],
+  "keywords": ["masv", "massive", "file", "transfer", "mcp", "llm", "ai", "cloud-storage", "api"],
   "license": "MIT",
   "server": {
     "type": "node",
