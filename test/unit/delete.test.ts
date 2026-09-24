@@ -2,6 +2,10 @@
 // that guards them is read from the environment at import time. The closed case is
 // covered in packages.test.ts and portals.test.ts; opening it needs a child process,
 // which is also the only way to reach the request these tools actually send.
+//
+// These tests cannot use test/helpers/fetch-stub.ts, because the stub would have to
+// live in this process while the code under test runs in another. So each script
+// replaces fetch itself and reports what it saw over stderr.
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
