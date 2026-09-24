@@ -49,6 +49,11 @@ jobs:
       - name: Check version and identity consistency
         run: bash scripts/check-versions.sh
 
+      # Keeps format-on-save from turning an unrelated file into review noise.
+      # `npm run format` fixes anything this reports.
+      - name: Check formatting
+        run: npm run format:check
+
       - name: Typecheck
         run: npx tsc --noEmit
 

@@ -9,6 +9,7 @@ npm and run with `npx`; a remote HTTP server is the goal (see `architecture.md`)
 - **Runtime:** Node.js >= 24
 - **Key deps:** `@modelcontextprotocol/sdk`, `zod` (tool input schemas)
 - **Build:** `tsc` → `build/` (dev dep `@anthropic-ai/mcpb` for `.mcpb` bundles)
+- **Formatting:** Prettier, `printWidth: 100`, everything else default
 
 ## Layout
 
@@ -46,6 +47,10 @@ scripts/              Build & publish scripts (bundle, Smithery release).
 - `npm run build` — typecheck + compile. Run before declaring work done.
 - `npm run inspector` — launch MCP Inspector against the built server.
 - `npm run bundle` — build + pack `.mcpb`.
+- `npm run format` / `npm run format:check` — Prettier, `printWidth: 100`. CI fails on unformatted
+  files. Run `format` before finishing a change; editors with format-on-save pick up
+  `.prettierrc.json` automatically, and without a config they default to 80 columns and reflow whole
+  files.
 - `npm test` is a stub. Tests and CI are wanted; when a runner is introduced, wire it into the
   build/verify loop and run it before declaring work done.
 
