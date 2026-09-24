@@ -34,11 +34,10 @@ async function getPortals({ page, limit, sort, ...params }: GetPortalsParams) {
 
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined) {
-      if (Array.isArray(value)) {
-        value.forEach((v) => url.searchParams.append(key, String(v)));
-      } else {
-        url.searchParams.append(key, String(value));
-      }
+      // MASV expects comma-separated lists (tags=a,b). Repeating the key does not
+      // filter, so the caller silently gets an unfiltered list back. String() on an
+      // array produces the comma form, which is how the other modules serialise.
+      url.searchParams.append(key, String(value));
     }
   });
 

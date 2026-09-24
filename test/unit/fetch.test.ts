@@ -145,3 +145,49 @@ describe("masvFetch", () => {
     });
   });
 });
+
+describe("masvFetch edge cases", () => {
+  it("says so when an error response has no body at all", async (t) => {
+    t.mock.method(globalThis, "fetch", async () => new Response(null, { status: 502 }));
+
+    await assert.rejects(
+      () => masvFetch(URL_),
+      (err: Error) => {
+        assert.match(err.message, /502/);
+        assert.match(err.message, /empty/i, err.message);
+        return true;
+      },
+    );
+  });
+
+  it("falls back to the raw target when it is not a parseable URL", async (t) => {
+    t.mock.method(globalThis, "fetch", async () => Response.json({}, { status: 500 }));
+
+    await assert.rejects(() => masvFetch("not-a-url"), /not-a-url/);
+  });
+});
+
+describe("masvFetch with an unreadable body", () => {
+  it("still reports the status when the body cannot be read", async (t) => {
+    // A response whose stream fails mid-read must not turn into an error about the
+    // stream; the status is the part the caller can act on.
+    t.mock.method(globalThis, "fetch", async () => ({
+      ok: false,
+      status: 503,
+      statusText: "Service Unavailable",
+      headers: new Headers(),
+      text: async () => {
+        throw new Error("stream closed");
+      },
+    }));
+
+    await assert.rejects(
+      () => masvFetch(URL_),
+      (err: Error) => {
+        assert.match(err.message, /503/);
+        assert.doesNotMatch(err.message, /stream closed/);
+        return true;
+      },
+    );
+  });
+});

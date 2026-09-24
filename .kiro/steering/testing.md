@@ -18,9 +18,12 @@ For a "what did I forget" pass: `node --test --experimental-test-coverage --impo
 ```
 test/
   setup.ts              dummy MASV_* env, loaded via --import before any test module
-  helpers/              shared spawn/client plumbing
+  helpers/
+    mcp-client.ts       spawns build/index.js, returns tools/list
+    child.ts            runs a snippet in a child process with chosen MASV_* vars
   unit/<domain>.test.ts one file per src/api/ module
-  tools/surface.test.ts the registered tool surface: annotations, doc parity
+  unit/delete.test.ts   the delete tools with the gate open (needs a child process)
+  tools/surface.test.ts the registered tool surface: annotations, manifest parity
   integration/          live API, self-skips without credentials
 ```
 
@@ -64,7 +67,12 @@ Rules:
 - **Cover both sides of every branch**, not just the happy one: gate open/closed, param present/absent,
   cursor present/absent, 2xx/4xx/5xx, JSON body and non-JSON body.
 - **Two-hop tools need two stub responses.** Anything reading a package token fetches the package first;
-  assert the second request carries `x-package-token`, not `x-api-key`.
+  assert the second request carries `x-package-token`, not `x-api-key`, and that a failed first hop stops
+  the second from firing.
+- **Assert `callCount` when a call should not happen.** Argument validation and the delete gate are only
+  worth anything if they run before the request, and a passing rejection test does not prove that.
+- **Pin array params as comma-joined** (`tags=a,b`). MASV does not filter on a repeated key, so getting
+  this wrong returns an unfiltered list and nothing reports an error.
 
 ## Environment
 
@@ -76,7 +84,12 @@ Rules:
 - Values are forced, not defaulted, so the suite behaves the same on a machine with real `MASV_*`
   exported.
 - `MASV_ALLOW_DELETE` is cleared, so the delete gate is closed. `env.ts` reads it once at import, so a
-  test cannot flip it mid-run — opening the gate needs a subprocess.
+  test cannot flip it mid-run.
+
+Anything that depends on the environment being different — a missing required variable, an open delete
+gate — needs a child process. `test/helpers/child.ts` provides one: it strips every `MASV_*` variable
+from the parent and applies only what the test asks for, so nothing leaks in from the developer's shell.
+Stub `globalThis.fetch` inside the snippet before importing the module under test.
 
 ## Import specifiers: `.ts`, not `.js`
 

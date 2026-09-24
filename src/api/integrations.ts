@@ -117,8 +117,15 @@ async function transferFilesFromIntegration({
     body: JSON.stringify(createPackageBody),
   });
 
-  const packageId = packageData.id;
-  const packageToken = packageData.access_token;
+  const packageId = packageData?.id;
+  const packageToken = packageData?.access_token;
+
+  if (!packageId || !packageToken) {
+    throw new Error(
+      "MASV created a package but did not return both an id and an access token for it, " +
+        "so the transfer cannot be started.",
+    );
+  }
 
   // Step 3: Initiate transfer
   const transferUrl = new URL(`${MASV_BASE_URL}/v1/packages/${packageId}/transfer`);
@@ -255,10 +262,13 @@ async function listFilesOnIntegration({
     hasMore = allFiles.length > PAGE_SIZE || data.more_data === true;
     files = allFiles.slice(0, PAGE_SIZE);
 
-    if (hasMore) {
+    // Advance by what this page actually returned, not by a whole page. The gateway
+    // can report more_data alongside a short page, and jumping PAGE_SIZE ahead of a
+    // short page skips the files in between.
+    if (hasMore && files.length > 0) {
       nextCursor = encodeCursor({
         type: "storage_gateway",
-        offset: offset + PAGE_SIZE,
+        offset: offset + files.length,
       });
     }
   } else {
@@ -283,9 +293,11 @@ async function listFilesOnIntegration({
     hasMore = allFiles.length > PAGE_SIZE;
     files = allFiles.slice(0, PAGE_SIZE);
 
-    if (hasMore) {
-      const lastFile = files[files.length - 1];
-      const lastPath = lastFile?.id || "";
+    // An empty last_file_path is sent as an empty prev_key, which the API reads as
+    // "start from the beginning" — so a paginating agent would re-read page 1
+    // forever. Better to report the truncation than to hand out that cursor.
+    const lastPath = files[files.length - 1]?.id;
+    if (hasMore && lastPath) {
       nextCursor = encodeCursor({ type: "cloud", last_file_path: lastPath });
     }
   }
@@ -310,6 +322,11 @@ async function listFilesOnIntegration({
   if (hasMore && nextCursor) {
     formattedLines.push(
       `\nMore results available. Call this tool again with cursor: ${nextCursor}`,
+    );
+  } else if (hasMore) {
+    formattedLines.push(
+      `\nMore results exist, but pagination cannot continue from this page: the last item ` +
+        `has no id to resume from. Narrow the search with a more specific path.`,
     );
   }
 
@@ -338,6 +355,7 @@ function formatFileSize(bytes: number): string {
 }
 
 export {
+  formatFileSize,
   getIntegrations,
   getIntegration,
   SendPackageToIntegrationSchema,

@@ -39,4 +39,19 @@ describe("test bootstrap", () => {
       content: [{ type: "text", text: "boom" }],
     });
   });
+
+  it("mcpOk serialises an object as indented JSON", () => {
+    assert.deepEqual(mcpOk({ id: "pkg1" }), {
+      content: [{ type: "text", text: '{\n  "id": "pkg1"\n}' }],
+    });
+  });
+
+  it("mcpError stringifies a value that is not an Error", () => {
+    // A rejected promise can carry anything; String() keeps the message readable
+    // rather than rendering "[object Object]" from a template literal.
+    assert.deepEqual(mcpError("plain failure"), {
+      isError: true,
+      content: [{ type: "text", text: "plain failure" }],
+    });
+  });
 });

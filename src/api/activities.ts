@@ -66,8 +66,17 @@ async function getActivities(params: GetActivitiesParams) {
 
   const data = await masvFetch(url, { headers });
 
-  const additionalContext = getActivitiesInformation();
-  data.activities_description = additionalContext;
+  // The reference text is attached to the payload, which only works on a plain
+  // object: null would throw a bare TypeError, and on an array the property is
+  // dropped by JSON.stringify, so the model would silently never receive it.
+  if (data === null || typeof data !== "object" || Array.isArray(data)) {
+    throw new Error(
+      `MASV returned an unexpected activities payload: expected an object, got ` +
+        `${Array.isArray(data) ? "an array" : data === null ? "null" : typeof data}.`,
+    );
+  }
+
+  data.activities_description = getActivitiesInformation();
 
   return data;
 }
