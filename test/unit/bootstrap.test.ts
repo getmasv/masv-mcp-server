@@ -1,5 +1,6 @@
-// Guards the two things phase 0 bought, both of which fail loudly and confusingly
-// if they regress:
+// Guards the two preconditions every other test depends on. Both fail loudly and
+// confusingly if they regress, so they get named assertions here rather than
+// surfacing as an unrelated-looking failure somewhere else:
 //
 //  1. Relative imports inside src/ resolve under Node's type stripping. This only
 //     works because src/ authors specifiers as ".ts" and tsc rewrites them on emit

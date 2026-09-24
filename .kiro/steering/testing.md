@@ -1,159 +1,168 @@
 # Testing
 
-The reason this project had no tests for so long was not the credentials — it was that the only test
-shape imagined was end-to-end. Most of the regression value here needs no network and no credentials.
+How to write and run tests in this repo.
 
-This codebase is an adapter with almost no business logic, so the highest-value tests are
-contract-shaped: does the request go out correctly, and does the tool surface match what we publish.
-
-## Two tiers
-
-| Tier                  | Creds? | Network? | Runs on                   | Covers                                                                            |
-| --------------------- | ------ | -------- | ------------------------- | --------------------------------------------------------------------------------- |
-| **1 — Offline**       | No     | No       | Every PR, including forks | Request building, error mapping, gates, param branches, parsing, the tool surface |
-| **2 — Live contract** | Yes    | Yes      | `main`, tags, manual only | Real status codes and response shapes, array param format, auth                   |
-
-Tier 1 is the default and where new tests belong. Reach for tier 2 only for a question the real API is
-the only authority on.
-
-There is deliberately no recorded-fixture tier. Every defect found in this codebase has been
-request-side — a dropped query param, an unchecked status code, an array serialized two different ways —
-and a recorded response says nothing about any of them. Where response shape is genuinely load-bearing,
-write a five-line hand-made stub: a stub states the contract you rely on, a fixture merely records a
-sighting.
-
-## Running
+## Run
 
 ```bash
-npm test          # tier 1. offline, credential-free. build first — some tests spawn build/index.js
-npm run build && npm test
+npm run build && npm test     # offline suite. no credentials, no network
 ```
 
-Coverage is available locally via `node --test --experimental-test-coverage …`. Use it to find what you
-forgot. **Do not gate CI on a coverage number.**
+Build first: some tests spawn `build/index.js`. Run `npm test` before declaring work done.
 
-CI runs `npm test` _after_ `npm run bundle`, not next to the typecheck where it would read more
-naturally, because the tool-surface tests need a build to exist.
+For a "what did I forget" pass: `node --test --experimental-test-coverage --import ./test/setup.ts
+'test/{unit,tools}/**/*.test.ts'`. There is no coverage gate and should not be one.
 
-## Runner: `node:test`, zero dependencies
+## Where a test goes
 
-`node:test` + `node:assert/strict`. Vitest was considered and declined — it buys nothing here once
-import specifiers are migrated, and `t.mock.method` covers every assertion we need.
+```
+test/
+  setup.ts              dummy MASV_* env, loaded via --import before any test module
+  helpers/              shared spawn/client plumbing
+  unit/<domain>.test.ts one file per src/api/ module
+  tools/surface.test.ts the registered tool surface: annotations, doc parity
+  integration/          live API, self-skips without credentials
+```
 
-`mock.module` still needs `--experimental-test-module-mocks` on Node 24. Don't reach for it; the fetch
-seam below removes the need.
+Default to `test/unit/`. Use `test/integration/` only for a question the real API is the sole authority
+on — array serialization format, whether an endpoint accepts a partial body, real status codes.
 
-## The `.ts` specifier rule
+## Write a unit test
 
-**Relative imports in `src/` are written with a `.ts` extension**, not `.js`:
+`node:test` + `node:assert/strict`. No other dependencies, no mock harness — the runner is one.
+
+Stub `globalThis.fetch`. Every API module calls bare `fetch`, so that one seam covers every tool with no
+production change. `t.mock.method` restores the original when the test ends.
 
 ```ts
-import { MASV_BASE_URL } from "./env.ts";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { getPackages } from "../../src/api/packages.ts";
+
+it("forwards page to the query string", async (t) => {
+  const f = t.mock.method(globalThis, "fetch", async () => Response.json({ packages: [] }));
+
+  await getPackages({ page: 3, limit: 10 });
+
+  const [url, init] = f.mock.calls[0].arguments as [string, RequestInit];
+  assert.match(url, /page=3/);
+  assert.equal(f.mock.callCount(), 1);
+});
 ```
 
-This is load-bearing, not style. Node's type stripping does not map a `.js` specifier onto a `.ts` file
-on disk, and it deliberately ignores `tsconfig.json` — that is what keeps stripping light enough to need
-no source maps. With `.js` specifiers, `node --test` cannot import `src/` **at all**:
+Assert on what the request carried — URL, query params, method, headers, body — and on how a response is
+mapped to a tool result. That is where this codebase's defects live; it is an adapter with almost no
+business logic.
+
+Rules:
+
+- **Stub only `fetch`.** Don't mock our own modules. `mock.module` needs
+  `--experimental-test-module-mocks` and is never needed here.
+- **No recorded fixtures.** Where response shape is load-bearing, hand-write a five-line stub stating the
+  contract you rely on.
+- **Cover both sides of every branch**, not just the happy one: gate open/closed, param present/absent,
+  cursor present/absent, 2xx/4xx/5xx, JSON body and non-JSON body.
+- **Two-hop tools need two stub responses.** Anything reading a package token fetches the package first;
+  assert the second request carries `x-package-token`, not `x-api-key`.
+
+## Environment
+
+`test/setup.ts` sets the dummy env before the module graph loads. It must exist because
+`src/api/env.ts` validates at import time — every API module throws without it.
+
+- Base URL is `https://api.test.invalid`. `.invalid` cannot resolve, so a request that escapes its stub
+  fails as a DNS error instead of reaching a real host.
+- Values are forced, not defaulted, so the suite behaves the same on a machine with real `MASV_*`
+  exported.
+- `MASV_ALLOW_DELETE` is cleared, so the delete gate is closed. `env.ts` reads it once at import, so a
+  test cannot flip it mid-run — opening the gate needs a subprocess.
+
+## Import specifiers: `.ts`, not `.js`
+
+**Relative imports in `src/` must use a `.ts` extension.** `tsc` rewrites them to `.js` on emit
+(`rewriteRelativeImportExtensions`), so the published package is unaffected.
+
+```ts
+import { MASV_BASE_URL } from "./env.ts"; // correct
+import { MASV_BASE_URL } from "./env.js"; // breaks every test importing this module
+```
+
+Node's type stripping does not map a `.js` specifier onto a `.ts` file, and it ignores `tsconfig.json`.
+One `.js` specifier makes the module unimportable from a test:
 
 ```
 Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/…/src/env.js' imported from /…/src/lib.ts
 ```
 
-Writing tests in JavaScript does not dodge this — the failure is inside `src/*.ts` resolving its own
-imports, so the test file's language is irrelevant.
+Writing tests in JavaScript does not help — the failure is inside `src/` resolving its own imports.
+`test/unit/bootstrap.test.ts` guards this.
 
-`tsc` rewrites the extensions back to `.js` on emit via `rewriteRelativeImportExtensions`, so the
-published package is unaffected. When this was introduced, the emitted `build/` was byte-for-byte
-identical before and after. `test/unit/bootstrap.test.ts` guards the invariant.
+`paths` aliases and `#subpath` imports are not rewritten; neither is used. If one appears, `tsc` reports
+`TS2877` and CI fails, so it cannot regress silently.
 
-Two things are **not** rewritten: `paths` aliases and `#subpath` imports. Neither is used here. If one
-appears, TypeScript reports `TS2877` and the typecheck fails, so it cannot regress silently.
+## Syntax `src/` cannot use
 
-## What type stripping forbids
-
-`erasableSyntaxOnly` is on, which bans **`enum`, `namespace`, and constructor parameter properties**.
-
-The flag is not the constraint, it just moves the error somewhere useful. Without it, `tsc` compiles an
-enum happily and Node then refuses to run the file with
-`ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX`. Stripping paints over type annotations with whitespace; an enum has
-to _generate_ a runtime object, so there is nothing to strip.
-
-Use a const object instead, which also serializes better for a server whose entire output is JSON read
-by a model:
+Type stripping runs the sources as-is, so `enum`, `namespace`, and constructor parameter properties are
+banned. `erasableSyntaxOnly` catches them at compile time instead of as a runtime
+`ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX` mid-test-run. Use a const object:
 
 ```ts
 export const Direction = { Up: "up", Down: "down" } as const;
 export type Direction = (typeof Direction)[keyof typeof Direction];
 ```
 
-`verbatimModuleSyntax` is also on: type-only imports need `import type`.
+`verbatimModuleSyntax` is on: type-only imports need `import type`.
 
-Test files are deliberately **not** typechecked — one `tsconfig.json`, `include` is `src/**/*` only,
-because tsc would otherwise emit compiled tests into `build/`, which `package.json` publishes wholesale.
-Type errors in test code surface as failing tests. Editors still resolve types normally.
-
-## One mock seam: `globalThis.fetch`
-
-Every API module calls bare `fetch`, so a single seam covers all tools with no production change:
-
-```ts
-const f = t.mock.method(globalThis, "fetch", async (url, init) => new Response("{}"));
-// … call the tool …
-const [url, init] = f.mock.calls[0].arguments as [string, RequestInit];
-```
-
-`t.mock.method` restores the original at the end of each test automatically. Captured URL, method, and
-headers are all we need. Do not build a mock harness — the runner already is one.
-
-Stub at the boundary you don't own; don't mock what you do own.
-
-## Environment
-
-`test/setup.ts` is loaded with `--import` and sets dummy `MASV_*` values before the module graph loads.
-It has to exist because `src/api/env.ts` validates at import time, so every API module throws without
-credentials.
-
-- The base URL is `https://api.test.invalid`. `.invalid` is RFC-reserved and cannot resolve, so a
-  request that escapes its stub fails as a DNS error instead of quietly reaching a real host.
-- The values are **forced, not defaulted**, so `npm test` behaves identically on a machine that exports
-  real `MASV_*` vars in its shell.
-- `MASV_ALLOW_DELETE` is cleared, so the delete gate is closed by default. `env.ts` reads it once at
-  import, so a test cannot flip it mid-run — opening the gate needs a subprocess.
-
-## Credential boundary
-
-`npm test` must stay credential-free and offline. That property is what makes it safe to run a fork's
-code in CI.
-
-- `ci.yml` references **no secrets**, uses `pull_request` (never `pull_request_target`), and installs
-  with `npm ci --ignore-scripts`. Keep all of that true.
-- Never combine `pull_request_target` with a checkout of `head.sha`. That is the "pwn request" hole:
-  anyone forks, adds a `postinstall`, opens a PR, and the key leaves in their run. No merge required.
-- A PR from a branch _in this repo_ does get secrets under `pull_request`. "No secrets on PRs" is a
-  boundary against forks, not against insiders.
-- Staging base URL, team ID, and API key never appear in a committed file, a test, or a log. `local/` is
-  gitignored and is the only safe place for them in the tree.
-
-## Swagger is a hypothesis source, never an oracle
-
-A staging swagger document exists. It is broadly right and wrong in many small details, and its host is
-confidential — do not name it in a committed file.
-
-**No test ever validates against it**, in either tier. Generating contract tests from it would encode its
-mistakes as requirements and fail against a correct API. Use it to _find_ things worth checking, then
-confirm each against live staging. When code and swagger disagree, neither wins on paper — staging
-decides.
+Test files are not typechecked — `tsconfig.json` includes `src/**/*` only, because tsc would otherwise
+emit compiled tests into `build/`, which `package.json` publishes wholesale. Type errors in test code
+surface as failing tests. Editors resolve types normally.
 
 ## Adding a tool
 
-Two test-visible obligations, both enforced by `test/tools/surface.test.ts` once it lands:
+`test/tools/surface.test.ts` enumerates the real surface by spawning `build/index.js` and calling
+`tools/list` over an MCP client, the way `scripts/smithery-payload.mjs` does. `src/index.ts` connects a
+transport at module top level, so it is not importable; the subprocess is deliberate and makes these
+end-to-end checks of what we actually ship.
 
-1. A full annotation set — `title`, explicit `readOnlyHint`, and explicit `destructiveHint` whenever
-   `readOnlyHint` is `false`. See `tool-design.md` for why this is functional work.
-2. Name parity: the registered name must appear in `manifest.json` and in the README's tool list. That
-   turns the doc-sync rule into a failing build instead of something a human has to remember.
+It will fail unless the new tool has:
 
-The tool surface is enumerated by spawning `build/index.js` and calling `tools/list` over a real MCP
-client, the same way `scripts/smithery-payload.mjs` does. `src/index.ts` calls `main()` at module top
-level and connects a stdio transport, so it is not importable — the subprocess is the point, and it makes
-these genuine end-to-end checks of the surface we actually ship.
+1. `title`, an explicit `readOnlyHint`, and an explicit `destructiveHint` whenever `readOnlyHint` is
+   `false`. See `tool-design.md`.
+2. Its name in `manifest.json` and in the README's tool list.
+
+## Credentials and CI
+
+`npm test` must stay credential-free and offline. That is what makes it safe to run a fork's code in CI.
+
+- `ci.yml` references no secrets, triggers on `pull_request` (never `pull_request_target`), and installs
+  with `npm ci --ignore-scripts`. Keep all of it true.
+- Never combine `pull_request_target` with a checkout of `head.sha` — that is the "pwn request" hole: fork,
+  add a `postinstall`, open a PR, key leaves in their run, no merge needed.
+- A PR from a branch in this repo does get secrets under `pull_request`. The no-secrets boundary is
+  against forks, not insiders.
+- The staging base URL, team ID, and API key never appear in a committed file, a test, or a log. `local/`
+  is gitignored and is the only place for them in the tree.
+- The live suite runs on `main`, tags, and manual dispatch only, from a protected environment.
+
+## Live tests
+
+Staging permits real mutation, so:
+
+- Assert narrowly — status codes, field presence, types. GitHub masks declared secrets but a dumped
+  response body still prints real subdomains and recipient emails into a public log.
+- Never echo a package token, access token, or signed URL, even on failure.
+- Name created resources `mcp-test-<run_id>-…` and delete them in teardown, including on failure.
+- Keep the suite small. Every test is a real operation against a real team.
+- Self-skip without credentials so local runs stay green:
+
+  ```ts
+  const live = !!process.env.MASV_API_KEY;
+  describe("live API", { skip: !live ? "no credentials" : false }, () => {});
+  ```
+
+## Swagger is never an oracle
+
+The staging swagger document is broadly right and wrong in small details, and its host is confidential —
+do not name it in a committed file. No test validates against it, in either tier: generating tests from it
+encodes its mistakes as requirements. Use it to form a hypothesis, confirm against live staging. When code
+and swagger disagree, staging decides.
