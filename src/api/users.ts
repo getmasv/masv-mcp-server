@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { MASV_BASE_URL, MASV_TEAM_ID, MASV_API_KEY } from "./env.ts";
+import { masvFetch } from "./fetch.ts";
 
 const GetTeamMembersSchema = z.object({});
 
@@ -13,10 +14,7 @@ async function getTeamMembers(_params: GetTeamMembersParams) {
     "x-api-key": MASV_API_KEY,
   };
 
-  const r = await fetch(url.toString(), { headers });
-  const data = await r.json();
-
-  return data;
+  return masvFetch(url, { headers });
 }
 
 export { GetTeamMembersSchema, getTeamMembers };

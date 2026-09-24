@@ -23,6 +23,7 @@ src/
   mcp-responses.ts    mcpOk() / mcpError() helpers for tool results.
   api/
     env.ts            Reads/validates MASV_* env vars + MASV_BASE_URL.
+    fetch.ts          masvFetch(): the only place that calls fetch. Status + body handling.
     packages.ts       Package tools (schema + handler per tool).
     portals.ts        Portal tools.
     activities.ts     Activity/event tools.
@@ -42,8 +43,12 @@ scripts/              Build & publish scripts (bundle, Smithery release).
 - Register tools in `src/index.ts` via
   `server.registerTool(name, { title, description, inputSchema: Schema.shape, annotations }, handler)`.
   **Annotations are required** — see `tool-design.md`.
-- Return results with `mcpOk(data)`; catch errors and return `mcpError(error)`. Keep error handling
-  consistent across domains, including HTTP status handling.
+- **All API requests go through `masvFetch` (`src/api/fetch.ts`).** Never call `fetch` directly from a
+  domain module. It checks the status, keeps the API's own error text, and turns a non-JSON body into a
+  readable error instead of a JSON parse failure. It returns `null` for 204/empty bodies. Auth headers
+  stay at the call site, since requests use either the team API key or a per-package token.
+- Return results with `mcpOk(data)`; catch errors and return `mcpError(error)`. A handler that returns
+  normally is presented to the model as a result, so an unchecked error body reads as data.
 - Config comes from env only (`src/api/env.ts`). Never hardcode secrets or the team ID.
 - Destructive tools (`delete_package`, `delete_portal`) are gated behind `MASV_ALLOW_DELETE=true`. That is
   the only client-side gate by design — permissions belong to the API key. See `architecture.md`.

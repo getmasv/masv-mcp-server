@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { MASV_BASE_URL, MASV_TEAM_ID, MASV_API_KEY, MASV_ALLOW_DELETE } from "./env.ts";
+import { masvFetch } from "./fetch.ts";
 
 const GetPackagesSchema = z.object({
   page: z.number().min(1).describe("Page number of paginated response. First page is 1").optional(),
@@ -52,7 +53,7 @@ const GetPackagesSchema = z.object({
 
 type GetPackagesParams = z.infer<typeof GetPackagesSchema>;
 
-async function getPackages({ page, ...params }: GetPackagesParams) {
+async function getPackages(params: GetPackagesParams) {
   const url = new URL(`${MASV_BASE_URL}/v1.1/teams/${MASV_TEAM_ID}/packages`);
 
   Object.entries(params).forEach(([key, value]) => {
@@ -66,10 +67,7 @@ async function getPackages({ page, ...params }: GetPackagesParams) {
     "x-api-key": MASV_API_KEY,
   };
 
-  const r = await fetch(url.toString(), { headers });
-  const data = await r.json();
-
-  return data;
+  return masvFetch(url, { headers });
 }
 
 const GetPackageSchema = z.object({
@@ -86,10 +84,7 @@ async function getPackage({ packageId }: GetPackageParams) {
     "x-api-key": MASV_API_KEY,
   };
 
-  const r = await fetch(url.toString(), { headers });
-  const data = await r.json();
-
-  return data;
+  return masvFetch(url, { headers });
 }
 
 const GetPortalPackagesSchema = z.object({
@@ -147,7 +142,7 @@ const GetPortalPackagesSchema = z.object({
 
 type GetPortalPackagesParams = z.infer<typeof GetPortalPackagesSchema>;
 
-async function getPortalPackages({ page, ...params }: GetPortalPackagesParams) {
+async function getPortalPackages(params: GetPortalPackagesParams) {
   const url = new URL(`${MASV_BASE_URL}/v1.1/teams/${MASV_TEAM_ID}/inbox`);
 
   Object.entries(params).forEach(([key, value]) => {
@@ -161,10 +156,7 @@ async function getPortalPackages({ page, ...params }: GetPortalPackagesParams) {
     "x-api-key": MASV_API_KEY,
   };
 
-  const r = await fetch(url.toString(), { headers });
-  const data = await r.json();
-
-  return data;
+  return masvFetch(url, { headers });
 }
 
 async function getPackageToken(packageId: string) {
@@ -188,10 +180,7 @@ async function getPackageFiles({ packageId }: GetPackageFilesParams) {
     "x-package-token": packageToken,
   };
 
-  const r = await fetch(url.toString(), { headers });
-  const data = await r.json();
-
-  return data;
+  return masvFetch(url, { headers });
 }
 
 const GetPackageTransfersSchema = z.object({
@@ -214,10 +203,7 @@ async function getPackageTransfers({ packageId }: GetPackageTransfersParams) {
     "x-package-token": packageToken,
   };
 
-  const r = await fetch(url.toString(), { headers });
-  const data = await r.json();
-
-  return data;
+  return masvFetch(url, { headers });
 }
 
 const UpdatePackageExpiryDateSchema = z.object({
@@ -273,14 +259,11 @@ async function updatePackageExpiry({
     };
   }
 
-  const r = await fetch(url.toString(), {
+  return masvFetch(url, {
     method: "PUT",
     headers,
     body: JSON.stringify(body),
   });
-  const data = await r.json();
-
-  return data;
 }
 
 const DeletePackageSchema = z.object({
@@ -305,14 +288,10 @@ async function deletePackage({ packageId }: DeletePackageParams) {
     "x-package-token": packageToken,
   };
 
-  const r = await fetch(url.toString(), { method: "DELETE", headers });
+  // A successful delete answers 204 with no body, which masvFetch reports as null.
+  const data = await masvFetch(url, { method: "DELETE", headers });
 
-  if (r.status === 204) {
-    return { success: true, message: "Package deleted successfully" };
-  }
-
-  const data = await r.json();
-  return data;
+  return data ?? { success: true, message: "Package deleted successfully" };
 }
 
 export {

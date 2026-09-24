@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { MASV_BASE_URL, MASV_TEAM_ID, MASV_API_KEY, MASV_ALLOW_DELETE } from "./env.ts";
+import { masvFetch } from "./fetch.ts";
 
 const GetPortalsSchema = z.object({
   page: z.number().min(1).describe("Page number of paginated response. First page is 1").optional(),
@@ -46,10 +47,7 @@ async function getPortals({ page, limit, sort, ...params }: GetPortalsParams) {
     "x-api-key": MASV_API_KEY,
   };
 
-  const r = await fetch(url.toString(), { headers });
-  const data = await r.json();
-
-  return data;
+  return masvFetch(url, { headers });
 }
 
 const GetPortalSchema = z.object({
@@ -66,10 +64,7 @@ async function getPortal({ portalId }: GetPortalParams) {
     "x-api-key": MASV_API_KEY,
   };
 
-  const r = await fetch(url.toString(), { headers });
-  const data = await r.json();
-
-  return data;
+  return masvFetch(url, { headers });
 }
 
 const CreatePortalSchema = z.object({
@@ -240,14 +235,11 @@ async function createPortal(params: CreatePortalParams) {
     "x-api-key": MASV_API_KEY,
   };
 
-  const r = await fetch(url.toString(), {
+  return masvFetch(url, {
     method: "POST",
     headers,
     body: JSON.stringify(params),
   });
-
-  const data = await r.json();
-  return data;
 }
 
 const UpdatePortalSchema = z.object({
@@ -417,14 +409,11 @@ async function updatePortal({ portalId, ...params }: UpdatePortalParams) {
     "x-api-key": MASV_API_KEY,
   };
 
-  const r = await fetch(url.toString(), {
+  return masvFetch(url, {
     method: "PUT",
     headers,
     body: JSON.stringify(params),
   });
-
-  const data = await r.json();
-  return data;
 }
 
 const DeletePortalSchema = z.object({
@@ -447,14 +436,10 @@ async function deletePortal({ portalId }: DeletePortalParams) {
     "x-api-key": MASV_API_KEY,
   };
 
-  const r = await fetch(url.toString(), { method: "DELETE", headers });
+  // A successful delete answers 204 with no body, which masvFetch reports as null.
+  const data = await masvFetch(url, { method: "DELETE", headers });
 
-  if (r.status === 204) {
-    return { success: true, message: "Portal deleted successfully" };
-  }
-
-  const data = await r.json();
-  return data;
+  return data ?? { success: true, message: "Portal deleted successfully" };
 }
 
 export {

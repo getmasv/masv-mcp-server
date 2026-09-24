@@ -57,7 +57,8 @@ business logic.
 Rules:
 
 - **Stub only `fetch`.** Don't mock our own modules. `mock.module` needs
-  `--experimental-test-module-mocks` and is never needed here.
+  `--experimental-test-module-mocks` and is never needed here. `masvFetch` is ours: stub `fetch`
+  underneath it and its status handling applies, which makes an error-path test a two-liner.
 - **No recorded fixtures.** Where response shape is load-bearing, hand-write a five-line stub stating the
   contract you rely on.
 - **Cover both sides of every branch**, not just the happy one: gate open/closed, param present/absent,

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { MASV_BASE_URL, MASV_TEAM_ID, MASV_API_KEY } from "./env.ts";
 import { getPackageToken } from "./packages.ts";
+import { masvFetch } from "./fetch.ts";
 
 async function getIntegrations() {
   const url = new URL(`${MASV_BASE_URL}/v1/teams/${MASV_TEAM_ID}/cloud_connections`);
@@ -10,10 +11,7 @@ async function getIntegrations() {
     "x-api-key": MASV_API_KEY,
   };
 
-  const r = await fetch(url.toString(), { headers });
-  const data = await r.json();
-
-  return data;
+  return masvFetch(url, { headers });
 }
 
 async function getIntegration(integrationId: string) {
@@ -24,14 +22,7 @@ async function getIntegration(integrationId: string) {
     "x-api-key": MASV_API_KEY,
   };
 
-  const r = await fetch(url.toString(), { headers });
-  const data = await r.json();
-
-  if (r.ok) {
-    return data;
-  } else {
-    throw new Error(JSON.stringify(data));
-  }
+  return masvFetch(url, { headers });
 }
 
 const SendPackageToIntegrationSchema = z.object({
@@ -64,14 +55,11 @@ async function sendPackageToIntegration({
     cloud_connection_id: integrationId,
   };
 
-  const r = await fetch(url.toString(), {
+  return masvFetch(url, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
   });
-  const data = await r.json();
-
-  return data;
 }
 
 const TransferFileSchema = z.object({
@@ -123,17 +111,11 @@ async function transferFilesFromIntegration({
     "x-api-key": MASV_API_KEY,
   };
 
-  const createPackageResponse = await fetch(createPackageUrl.toString(), {
+  const packageData = await masvFetch(createPackageUrl, {
     method: "POST",
     headers: createPackageHeaders,
     body: JSON.stringify(createPackageBody),
   });
-
-  const packageData = await createPackageResponse.json();
-
-  if (!createPackageResponse.ok) {
-    throw new Error(`Failed to create package: ${JSON.stringify(packageData)}`);
-  }
 
   const packageId = packageData.id;
   const packageToken = packageData.access_token;
@@ -154,17 +136,11 @@ async function transferFilesFromIntegration({
     "x-package-token": packageToken,
   };
 
-  const transferResponse = await fetch(transferUrl.toString(), {
+  const transferData = await masvFetch(transferUrl, {
     method: "POST",
     headers: transferHeaders,
     body: JSON.stringify(transferBody),
   });
-
-  const transferData = await transferResponse.json();
-
-  if (!transferResponse.ok) {
-    throw new Error(`Failed to initiate transfer: ${JSON.stringify(transferData)}`);
-  }
 
   // Step 4: Format response for LLM
   const fileCount = files.length;
@@ -273,15 +249,17 @@ async function listFilesOnIntegration({
     // Request 1 more file to check if there are more files than we return
     url.searchParams.append("count", String(PAGE_SIZE + 1));
 
-    const r = await fetch(url.toString(), { headers });
-    const data = await r.json();
+    const data = await masvFetch(url, { headers });
 
     const allFiles = data.files || [];
     hasMore = allFiles.length > PAGE_SIZE || data.more_data === true;
     files = allFiles.slice(0, PAGE_SIZE);
 
     if (hasMore) {
-      nextCursor = encodeCursor({ type: "storage_gateway", offset: offset + PAGE_SIZE });
+      nextCursor = encodeCursor({
+        type: "storage_gateway",
+        offset: offset + PAGE_SIZE,
+      });
     }
   } else {
     // Cloud integrations use last_file_path cursor pagination
@@ -299,8 +277,7 @@ async function listFilesOnIntegration({
     // Request 1 more file to check if there are more files than we return
     url.searchParams.append("count", String(PAGE_SIZE + 1));
 
-    const r = await fetch(url.toString(), { headers });
-    const data = await r.json();
+    const data = await masvFetch(url, { headers });
 
     const allFiles = Array.isArray(data) ? data : [];
     hasMore = allFiles.length > PAGE_SIZE;
