@@ -10,6 +10,13 @@ MASV is an easy-to-use and ultra-reliable managed file transfer service designed
 
 Learn more https://masv.io/
 
+## Requirements
+
+**Node.js 24 or newer.** The published package is plain JavaScript compiled to ES2024, so no
+transpilation or polyfills are needed. Node 24 is the version the project is built and tested against, and
+the one the test suite requires — it imports the TypeScript sources directly using Node's built-in type
+stripping.
+
 ## Installation
 
 The server can be run directly with `npx` without installation, or installed globally if preferred:

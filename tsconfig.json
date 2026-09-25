@@ -1,11 +1,23 @@
 {
   "compilerOptions": {
-    // "nodenext" + .ts relative specifiers: source runs as-is under Node's type
-    // stripping (so `node --test` can import src/), and tsc rewrites the
-    // specifiers to .js on emit. See .kiro/steering/testing.md.
-    "target": "esnext",
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
+    // Matched to the supported runtime (Node >= 24, see package.json "engines").
+    //
+    // This does not affect the emitted JavaScript: src/ uses no syntax newer than
+    // ES2020, so tsc produces byte-identical output for every target from ES2020 to
+    // esnext. What it pins is `lib` — the standard library the checker believes
+    // exists. "esnext" would type Math.sumPrecise and Uint8Array.fromBase64 as
+    // available when Node 24 has neither, so code using them would compile and then
+    // crash. Every ES2024 API is present in Node 24.
+    "target": "ES2024",
+    // Pinned to a Node major rather than "nodenext", which is a moving alias whose
+    // meaning changes when TypeScript is upgraded. moduleResolution is deliberately
+    // omitted: "node20" implies it (as "node16", the name of the resolution family
+    // these versions share), and stating it invites the two drifting apart.
+    //
+    // This module setting plus .ts relative specifiers is what lets the sources run
+    // as-is under Node's type stripping, so `node --test` can import src/ while tsc
+    // still rewrites the specifiers to .js on emit. See .kiro/steering/testing.md.
+    "module": "node20",
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true,
     // Bans syntax Node cannot strip (enums, namespaces, parameter properties)
