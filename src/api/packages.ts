@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MASV_BASE_URL, MASV_TEAM_ID, MASV_API_KEY, MASV_ALLOW_DELETE } from "./env.ts";
+import { apiKey, baseUrl, deleteAllowed, teamId } from "./env.ts";
 import { masvFetch } from "./fetch.ts";
 
 const GetPackagesSchema = z.object({
@@ -54,7 +54,7 @@ const GetPackagesSchema = z.object({
 type GetPackagesParams = z.infer<typeof GetPackagesSchema>;
 
 async function getPackages(params: GetPackagesParams) {
-  const url = new URL(`${MASV_BASE_URL}/v1.1/teams/${MASV_TEAM_ID}/packages`);
+  const url = new URL(`${baseUrl()}/v1.1/teams/${teamId()}/packages`);
 
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined) {
@@ -64,7 +64,7 @@ async function getPackages(params: GetPackagesParams) {
 
   const headers = {
     "content-type": "application/json",
-    "x-api-key": MASV_API_KEY,
+    "x-api-key": apiKey(),
   };
 
   return masvFetch(url, { headers });
@@ -77,11 +77,11 @@ const GetPackageSchema = z.object({
 type GetPackageParams = z.infer<typeof GetPackageSchema>;
 
 async function getPackage({ packageId }: GetPackageParams) {
-  const url = new URL(`${MASV_BASE_URL}/v1.1/teams/${MASV_TEAM_ID}/packages/${packageId}`);
+  const url = new URL(`${baseUrl()}/v1.1/teams/${teamId()}/packages/${packageId}`);
 
   const headers = {
     "content-type": "application/json",
-    "x-api-key": MASV_API_KEY,
+    "x-api-key": apiKey(),
   };
 
   return masvFetch(url, { headers });
@@ -143,7 +143,7 @@ const GetPortalPackagesSchema = z.object({
 type GetPortalPackagesParams = z.infer<typeof GetPortalPackagesSchema>;
 
 async function getPortalPackages(params: GetPortalPackagesParams) {
-  const url = new URL(`${MASV_BASE_URL}/v1.1/teams/${MASV_TEAM_ID}/inbox`);
+  const url = new URL(`${baseUrl()}/v1.1/teams/${teamId()}/inbox`);
 
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined) {
@@ -153,7 +153,7 @@ async function getPortalPackages(params: GetPortalPackagesParams) {
 
   const headers = {
     "content-type": "application/json",
-    "x-api-key": MASV_API_KEY,
+    "x-api-key": apiKey(),
   };
 
   return masvFetch(url, { headers });
@@ -184,7 +184,7 @@ type GetPackageFilesParams = z.infer<typeof GetPackageFilesSchema>;
 async function getPackageFiles({ packageId }: GetPackageFilesParams) {
   const packageToken = await getPackageToken(packageId);
 
-  const url = new URL(`${MASV_BASE_URL}/v1/packages/${packageId}/files`);
+  const url = new URL(`${baseUrl()}/v1/packages/${packageId}/files`);
 
   const headers = {
     "content-type": "application/json",
@@ -207,7 +207,7 @@ type GetPackageTransfersParams = z.infer<typeof GetPackageTransfersSchema>;
 async function getPackageTransfers({ packageId }: GetPackageTransfersParams) {
   const packageToken = await getPackageToken(packageId);
 
-  const url = new URL(`${MASV_BASE_URL}/v1/packages/${packageId}/transfer`);
+  const url = new URL(`${baseUrl()}/v1/packages/${packageId}/transfer`);
 
   const headers = {
     "content-type": "application/json",
@@ -265,7 +265,7 @@ async function updatePackageExpiry({
 
   const packageToken = await getPackageToken(packageId);
 
-  const url = new URL(`${MASV_BASE_URL}/v1/packages/${packageId}/expiry`);
+  const url = new URL(`${baseUrl()}/v1/packages/${packageId}/expiry`);
 
   const headers = {
     "content-type": "application/json",
@@ -286,7 +286,7 @@ const DeletePackageSchema = z.object({
 type DeletePackageParams = z.infer<typeof DeletePackageSchema>;
 
 async function deletePackage({ packageId }: DeletePackageParams) {
-  if (!MASV_ALLOW_DELETE) {
+  if (!deleteAllowed()) {
     throw new Error(
       "Delete operations are not allowed. Set MASV_ALLOW_DELETE=true in environment variables to enable.",
     );
@@ -294,7 +294,7 @@ async function deletePackage({ packageId }: DeletePackageParams) {
 
   const packageToken = await getPackageToken(packageId);
 
-  const url = new URL(`${MASV_BASE_URL}/v1/packages/${packageId}`);
+  const url = new URL(`${baseUrl()}/v1/packages/${packageId}`);
 
   const headers = {
     "content-type": "application/json",

@@ -1,84 +1,162 @@
-// env.ts validates at import time, and test/setup.ts has already satisfied it by the
-// time any test runs. So the missing-variable behaviour can only be observed from a
-// child process with a deliberately incomplete environment.
+// Each accessor reads process.env when called, so every case here is an ordinary
+// in-process test: set the variables, call it, restore.
 
-import { describe, it } from "node:test";
+import { describe, it, type TestContext } from "node:test";
 import assert from "node:assert/strict";
 
-import { moduleUrl, runInChild } from "../helpers/child.ts";
-
-const ENV_MODULE = moduleUrl("src/api/env.ts");
+import { apiKey, assertConfigured, baseUrl, deleteAllowed, teamId } from "../../src/api/env.ts";
 
 /**
- * Imports env.ts with exactly the MASV_* vars given, optionally printing an export.
+ * Replaces the MASV_* environment for one test and restores it afterwards.
  *
- * The value is stringified in the child rather than logged raw: console.log formats a
- * non-string through util.inspect, which would wrap a boolean in ANSI colour codes
- * whenever colour is enabled.
+ * Every MASV_* variable is cleared first, so a test states the whole configuration it
+ * wants and cannot be affected by what test/setup.ts or another test left behind.
  */
-function importEnv(masvVars: Record<string, string>, print?: string) {
-  const script = print
-    ? `const m = await import(${ENV_MODULE}); console.log(String(m.${print}));`
-    : `await import(${ENV_MODULE});`;
+function withEnv(t: TestContext, vars: Record<string, string>) {
+  const saved = Object.fromEntries(
+    Object.keys(process.env)
+      .filter((key) => key.startsWith("MASV_"))
+      .map((key) => [key, process.env[key]]),
+  );
 
-  return runInChild(script, masvVars);
+  const clearAll = () => {
+    for (const key of Object.keys(process.env).filter((k) => k.startsWith("MASV_"))) {
+      delete process.env[key];
+    }
+  };
+
+  clearAll();
+  Object.assign(process.env, vars);
+
+  t.after(() => {
+    clearAll();
+    Object.assign(process.env, saved);
+  });
 }
 
-describe("env", () => {
-  it("refuses to load without MASV_TEAM_ID, naming the variable", () => {
-    const r = importEnv({ MASV_API_KEY: "k" });
+const credentials = { MASV_TEAM_ID: "t", MASV_API_KEY: "k" };
 
-    assert.notEqual(r.status, 0, "import should fail");
-    assert.match(r.stderr, /MASV_TEAM_ID is not set/);
+describe("teamId and apiKey", () => {
+  it("return the configured values", (t) => {
+    withEnv(t, credentials);
+
+    assert.equal(teamId(), "t");
+    assert.equal(apiKey(), "k");
   });
 
-  it("refuses to load without MASV_API_KEY, naming the variable", () => {
-    const r = importEnv({ MASV_TEAM_ID: "t" });
+  it("throw naming MASV_TEAM_ID when it is missing", (t) => {
+    withEnv(t, { MASV_API_KEY: "k" });
 
-    assert.notEqual(r.status, 0, "import should fail");
-    assert.match(r.stderr, /MASV_API_KEY is not set/);
+    assert.throws(() => teamId(), /MASV_TEAM_ID is not set/);
   });
 
-  it("points at the MCP server config in the failure message", () => {
+  it("throw naming MASV_API_KEY when it is missing", (t) => {
+    withEnv(t, { MASV_TEAM_ID: "t" });
+
+    assert.throws(() => apiKey(), /MASV_API_KEY is not set/);
+  });
+
+  it("treat an empty string as missing", (t) => {
+    // An empty team id would otherwise build /v1.1/teams//packages and 404 for a
+    // reason that says nothing about configuration.
+    withEnv(t, { MASV_TEAM_ID: "", MASV_API_KEY: "" });
+
+    assert.throws(() => teamId(), /MASV_TEAM_ID is not set/);
+    assert.throws(() => apiKey(), /MASV_API_KEY is not set/);
+  });
+
+  it("point at the MCP server config in the failure message", (t) => {
     // The people hitting this are configuring a client, not reading our source.
-    const r = importEnv({});
+    withEnv(t, {});
 
-    assert.match(r.stderr, /MCP server config/);
+    assert.throws(() => teamId(), /MCP server config/);
+  });
+});
+
+describe("baseUrl", () => {
+  it("defaults to production", (t) => {
+    withEnv(t, credentials);
+
+    assert.equal(baseUrl(), "https://api.massive.app");
   });
 
-  it("loads when both required variables are present", () => {
-    const r = importEnv({ MASV_TEAM_ID: "t", MASV_API_KEY: "k" });
+  it("can be overridden", (t) => {
+    withEnv(t, { ...credentials, MASV_BASE_URL: "https://api.example.invalid" });
 
-    assert.equal(r.status, 0, r.stderr);
+    assert.equal(baseUrl(), "https://api.example.invalid");
   });
 
-  it("defaults MASV_BASE_URL to production", () => {
-    const r = importEnv({ MASV_TEAM_ID: "t", MASV_API_KEY: "k" }, "MASV_BASE_URL");
+  it("falls back to production when set to an empty string", (t) => {
+    withEnv(t, { ...credentials, MASV_BASE_URL: "" });
 
-    assert.equal(r.stdout.trim(), "https://api.massive.app");
+    assert.equal(baseUrl(), "https://api.massive.app");
+  });
+});
+
+describe("deleteAllowed", () => {
+  it("is closed when the variable is unset", (t) => {
+    withEnv(t, credentials);
+
+    assert.equal(deleteAllowed(), false);
   });
 
-  it("lets MASV_BASE_URL be overridden", () => {
-    const r = importEnv(
-      { MASV_TEAM_ID: "t", MASV_API_KEY: "k", MASV_BASE_URL: "https://api.example.invalid" },
-      "MASV_BASE_URL",
-    );
-
-    assert.equal(r.stdout.trim(), "https://api.example.invalid");
-  });
-
-  it("treats MASV_ALLOW_DELETE as true only for the exact string 'true'", () => {
-    const base = { MASV_TEAM_ID: "t", MASV_API_KEY: "k" };
-
+  it("opens only for the exact string 'true'", (t) => {
+    // A near miss must fail closed: this gate stands in front of the only two
+    // irreversible operations in the server.
     for (const [value, expected] of [
-      ["true", "true"],
-      ["TRUE", "false"],
-      ["1", "false"],
-      ["yes", "false"],
-      ["", "false"],
-    ]) {
-      const r = importEnv({ ...base, MASV_ALLOW_DELETE: value as string }, "MASV_ALLOW_DELETE");
-      assert.equal(r.stdout.trim(), expected, `MASV_ALLOW_DELETE=${JSON.stringify(value)}`);
+      ["true", true],
+      ["TRUE", false],
+      ["True", false],
+      ["1", false],
+      ["yes", false],
+      ["", false],
+      [" true", false],
+    ] as const) {
+      withEnv(t, { ...credentials, MASV_ALLOW_DELETE: value });
+
+      assert.equal(deleteAllowed(), expected, `MASV_ALLOW_DELETE=${JSON.stringify(value)}`);
     }
+  });
+
+  it("does not require credentials to be configured", (t) => {
+    // The gate is policy, not authentication, and deletePackage checks it first.
+    withEnv(t, { MASV_ALLOW_DELETE: "true" });
+
+    assert.equal(deleteAllowed(), true);
+  });
+});
+
+describe("assertConfigured", () => {
+  it("passes when both credentials are present", (t) => {
+    withEnv(t, credentials);
+
+    assert.doesNotThrow(() => assertConfigured());
+  });
+
+  it("throws when either is missing", (t) => {
+    withEnv(t, { MASV_API_KEY: "k" });
+    assert.throws(() => assertConfigured(), /MASV_TEAM_ID is not set/);
+  });
+
+  it("does not require MASV_BASE_URL", (t) => {
+    // Only the credentials are mandatory; the base URL has a default.
+    withEnv(t, credentials);
+
+    assert.doesNotThrow(() => assertConfigured());
+  });
+});
+
+describe("nothing is cached", () => {
+  it("reflects a change between calls", (t) => {
+    // The property the whole design rests on. If an accessor ever starts caching, the
+    // env tests stop testing anything and the delete gate becomes unreachable.
+    withEnv(t, credentials);
+    assert.equal(baseUrl(), "https://api.massive.app");
+
+    process.env.MASV_BASE_URL = "https://second.invalid";
+    assert.equal(baseUrl(), "https://second.invalid");
+
+    process.env.MASV_ALLOW_DELETE = "true";
+    assert.equal(deleteAllowed(), true);
   });
 });

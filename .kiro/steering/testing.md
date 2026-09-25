@@ -37,11 +37,11 @@ test/
   setup.ts              dummy MASV_* env, loaded via --import before any test module
   helpers/
     mcp-client.ts       spawns build/index.js, returns tools/list
-    child.ts            runs a snippet in a child process with chosen MASV_* vars
+
     fetch-stub.ts       stubs globalThis.fetch and records what was sent
   unit/<domain>.test.ts one file per src/api/ module
-  unit/delete.test.ts   the delete tools with the gate open (needs a child process)
-  tools/surface.test.ts the registered tool surface: annotations, manifest parity
+  unit/delete.test.ts   the delete tools, both sides of the gate
+  tools/surface.test.ts the registered tool surface: annotations, manifest parity, startup
   integration/          live API, self-skips without credentials
 ```
 
@@ -166,17 +166,31 @@ Both matter, in different places, so it is worth knowing which one is reachable:
 - `MASV_ALLOW_DELETE` is cleared, so the delete gate is closed. `env.ts` reads it once at import, so a
   test cannot flip it mid-run.
 
-Anything that depends on the environment being different — a missing required variable, an open delete
-gate — needs a child process. `test/helpers/child.ts` provides one: it strips every `MASV_*` variable
-from the parent and applies only what the test asks for, so nothing leaks in from the developer's shell.
-Stub `globalThis.fetch` inside the snippet before importing the module under test.
+**Configuration is read at the point of use, which is what keeps it testable.** The accessors in `env.ts`
+— `baseUrl()`, `teamId()`, `apiKey()`, `deleteAllowed()` — read `process.env` on every call instead of
+caching values in module constants, so any environment case is an ordinary in-process test: set the
+variables, call the code, restore. Set a variable and the next call sees it; there is nothing to reload.
 
-**Make the child's output explicit.** Report values with `String(x)` or `JSON.stringify(x)`, never by
-logging them raw. `console.log` formats anything that is not a string through `util.inspect`, so a boolean
-comes back as `\x1B[33mtrue\x1B[39m` once colour is enabled — and colour is enabled whenever the parent has
-`FORCE_COLOR` set, which npm does from an interactive terminal but not from a pipe. A test that ignores
-this passes in CI and for anyone running it non-interactively, then fails on a real terminal.
-`child.ts` also sets `NO_COLOR` in the child as a second line of defence.
+```ts
+function withEnv(t: TestContext, vars: Record<string, string>) {
+  // clear every MASV_* var, apply `vars`, restore in t.after()
+}
+```
+
+Two rules when doing this:
+
+- **Clear the whole `MASV_*` set before applying yours.** Otherwise a test inherits whatever `setup.ts` or
+  a previous test left behind, and the result depends on file ordering.
+- **Restore in `t.after()`,** not at the end of the body, so a failing assertion cannot leak state into the
+  next test. `test/unit/delete.test.ts` ends with a test asserting the gate is closed by default, which is
+  cheap insurance against exactly that leak.
+
+Do not add a module constant that caches an environment value. It reintroduces the problem this design
+exists to avoid, and the only way to test around it is reloading the module in a separate process.
+
+The one thing left that needs a separate process is the server's own startup, because `src/index.ts`
+connects a transport at module top level and cannot be imported. `test/tools/surface.test.ts` spawns the
+built `build/index.js` for that — a real file, with no code passed as a string.
 
 ## Import specifiers: `.ts`, not `.js`
 

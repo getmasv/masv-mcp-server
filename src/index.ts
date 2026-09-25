@@ -48,13 +48,12 @@ import {
   deletePortal,
 } from "./api/portals.ts";
 import { GetTeamMembersSchema, getTeamMembers } from "./api/users.ts";
-import { MASV_TEAM_ID, MASV_API_KEY } from "./api/env.ts";
+import { assertConfigured } from "./api/env.ts";
 
-// Check required variables
-if (!MASV_TEAM_ID || !MASV_API_KEY)
-  throw new Error(
-    "Please set MASV_TEAM_ID and MASV_API_KEY variables in MCP server config or environment variables.",
-  );
+// Check required variables once, before registering anything. Configuration is
+// otherwise read at the point of use, so without this the server would start happily
+// and then fail on every tool call instead of saying what is missing.
+assertConfigured();
 
 // Server instance
 const server = new McpServer({

@@ -6,8 +6,8 @@
 //     works because src/ authors specifiers as ".ts" and tsc rewrites them on emit
 //     (rewriteRelativeImportExtensions). Reintroducing a ".js" specifier in src/
 //     breaks every test that imports that module with ERR_MODULE_NOT_FOUND.
-//  2. test/setup.ts runs before the module graph loads, so src/api/env.ts finds
-//     the dummy credentials it validates at import time.
+//  2. test/setup.ts runs before any test module, so the dummy credentials are in
+//     place for every call that reads configuration.
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -15,7 +15,7 @@ import assert from "node:assert/strict";
 import { mcpOk, mcpError } from "../../src/mcp-responses.ts";
 // packages.ts imports ./env.ts, so importing it exercises both invariants at once.
 import { getPackages, GetPackagesSchema } from "../../src/api/packages.ts";
-import { MASV_BASE_URL, MASV_TEAM_ID, MASV_ALLOW_DELETE } from "../../src/api/env.ts";
+import { baseUrl, deleteAllowed, teamId } from "../../src/api/env.ts";
 
 describe("test bootstrap", () => {
   it("resolves relative .ts imports across src/", () => {
@@ -24,10 +24,10 @@ describe("test bootstrap", () => {
     assert.equal(typeof mcpOk, "function");
   });
 
-  it("loads the dummy environment before env.ts validates it", () => {
-    assert.equal(MASV_BASE_URL, "https://api.test.invalid");
-    assert.equal(MASV_TEAM_ID, "test-team");
-    assert.equal(MASV_ALLOW_DELETE, false);
+  it("provides the dummy environment every test relies on", () => {
+    assert.equal(baseUrl(), "https://api.test.invalid");
+    assert.equal(teamId(), "test-team");
+    assert.equal(deleteAllowed(), false, "the delete gate must start closed");
   });
 
   it("mcpOk and mcpError produce MCP tool results", () => {

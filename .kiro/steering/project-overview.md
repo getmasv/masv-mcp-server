@@ -49,7 +49,12 @@ scripts/              Build & publish scripts (bundle, Smithery release).
   stay at the call site, since requests use either the team API key or a per-package token.
 - Return results with `mcpOk(data)`; catch errors and return `mcpError(error)`. A handler that returns
   normally is presented to the model as a result, so an unchecked error body reads as data.
-- Config comes from env only (`src/api/env.ts`). Never hardcode secrets or the team ID.
+- Config comes from env only, through the accessors in `src/api/env.ts` — `baseUrl()`, `teamId()`,
+  `apiKey()`, `deleteAllowed()` — which read `process.env` on every call. Never cache one in a module
+  constant, and don't read `process.env` directly in a domain module: the accessors return a validated
+  `string` where `process.env.X` is `string | undefined`, which does not satisfy the header objects and
+  interpolates as the literal "undefined" into a URL. `src/index.ts` calls `assertConfigured()` once at
+  boot so a missing credential fails immediately. Never hardcode secrets or the team ID.
 - Destructive tools (`delete_package`, `delete_portal`) are gated behind `MASV_ALLOW_DELETE=true`. That is
   the only client-side gate by design — permissions belong to the API key. See `architecture.md`.
 - The server never touches the local filesystem. Local files are reached via Storage Gateway only.

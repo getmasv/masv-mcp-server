@@ -1,116 +1,145 @@
-// The delete tools are the only irreversible operations in the server, and the gate
-// that guards them is read from the environment at import time. The closed case is
-// covered in packages.test.ts and portals.test.ts; opening it needs a child process,
-// which is also the only way to reach the request these tools actually send.
+// The delete tools are the only irreversible operations in the server, so both sides
+// of their gate are worth pinning, along with the request each one actually sends.
 //
-// These tests cannot use test/helpers/fetch-stub.ts, because the stub would have to
-// live in this process while the code under test runs in another. So each script
-// replaces fetch itself and reports what it saw over stderr.
+// env.ts reads MASV_ALLOW_DELETE at call time rather than caching it at import, which
+// is what lets these run in-process like every other test.
 
-import { describe, it } from "node:test";
+import { describe, it, type TestContext } from "node:test";
 import assert from "node:assert/strict";
 
-import { moduleUrl, runInChild } from "../helpers/child.ts";
+import { deletePackage } from "../../src/api/packages.ts";
+import { deletePortal } from "../../src/api/portals.ts";
+import { json, noContent, stubFetch } from "../helpers/fetch-stub.ts";
 
-const OPEN = {
-  MASV_TEAM_ID: "test-team",
-  MASV_API_KEY: "test-key",
-  MASV_BASE_URL: "https://api.test.invalid",
-  MASV_ALLOW_DELETE: "true",
-};
+/** Opens the gate for one test and closes it again afterwards. */
+function allowDelete(t: TestContext) {
+  process.env.MASV_ALLOW_DELETE = "true";
+  t.after(() => {
+    delete process.env.MASV_ALLOW_DELETE;
+  });
+}
+
+const lookup = () => json({ id: "pkg1", access_token: "tok-abc" });
+
+describe("deletePackage with the gate closed", () => {
+  it("refuses and sends no request at all", async (t) => {
+    const sent = stubFetch(t, lookup());
+
+    await assert.rejects(() => deletePackage({ packageId: "pkg1" }), /MASV_ALLOW_DELETE/);
+    assert.equal(sent.count(), 0, "the gate must close before the package lookup");
+  });
+
+  it("names the variable that would open it", async (t) => {
+    stubFetch(t);
+
+    await assert.rejects(() => deletePackage({ packageId: "pkg1" }), /Set MASV_ALLOW_DELETE=true/);
+  });
+});
 
 describe("deletePackage with the gate open", () => {
-  // Hop 1 is the package lookup for a token; hop 2 is the delete itself, which
-  // answers 204 with no body.
-  const script = `
-    let call = 0;
-    globalThis.fetch = async (url, init) => {
-      call++;
-      if (call === 1) return Response.json({ id: "pkg1", access_token: "tok-abc" });
-      console.error(JSON.stringify({
-        url: String(url),
-        method: init.method,
-        token: init.headers["x-package-token"],
-        apiKey: init.headers["x-api-key"] ?? null,
-      }));
-      return new Response(null, { status: 204 });
-    };
-    const { deletePackage } = await import(${moduleUrl("src/api/packages.ts")});
-    console.log(JSON.stringify(await deletePackage({ packageId: "pkg1" })));
-  `;
+  it("sends DELETE with the package token", async (t) => {
+    allowDelete(t);
+    const sent = stubFetch(t, lookup(), noContent());
 
-  it("reports success for a 204 with no body", () => {
-    const r = runInChild(script, OPEN);
+    await deletePackage({ packageId: "pkg1" });
 
-    assert.equal(r.status, 0, r.stderr);
-    assert.deepEqual(JSON.parse(r.stdout), {
+    assert.equal(sent.count(), 2);
+    assert.equal(sent.method(1), "DELETE");
+    assert.match(sent.url(1), /\/v1\/packages\/pkg1$/);
+    assert.equal(sent.headers(1)["x-package-token"], "tok-abc");
+    assert.equal(sent.headers(1)["x-api-key"], undefined, "the team key must not be sent");
+  });
+
+  it("reports success for a 204 with no body", async (t) => {
+    allowDelete(t);
+    stubFetch(t, lookup(), noContent());
+
+    assert.deepEqual(await deletePackage({ packageId: "pkg1" }), {
       success: true,
       message: "Package deleted successfully",
     });
   });
 
-  it("sends DELETE with the package token", () => {
-    const r = runInChild(script, OPEN);
-    const request = JSON.parse(r.stderr.trim().split("\n").at(-1) as string);
+  it("returns the API's own body when it answers with one", async (t) => {
+    allowDelete(t);
+    stubFetch(t, lookup(), json({ id: "pkg1", state: "archived" }));
 
-    assert.equal(request.method, "DELETE");
-    assert.match(request.url, /\/v1\/packages\/pkg1$/);
-    assert.equal(request.token, "tok-abc");
-    assert.equal(request.apiKey, null, "the team key must not be sent on this hop");
+    assert.deepEqual(await deletePackage({ packageId: "pkg1" }), {
+      id: "pkg1",
+      state: "archived",
+    });
+  });
+
+  it("surfaces an API refusal rather than claiming success", async (t) => {
+    allowDelete(t);
+    stubFetch(t, lookup(), json({ error: "package is locked" }, 409));
+
+    await assert.rejects(
+      () => deletePackage({ packageId: "pkg1" }),
+      (err: Error) => {
+        assert.match(err.message, /409/);
+        assert.match(err.message, /package is locked/);
+        return true;
+      },
+    );
+  });
+
+  it("fails on the package lookup without attempting the delete", async (t) => {
+    allowDelete(t);
+    const sent = stubFetch(t, json({ error: "not found" }, 404));
+
+    await assert.rejects(() => deletePackage({ packageId: "bogus" }), /404/);
+    assert.equal(sent.count(), 1, "nothing should be deleted after a failed lookup");
+  });
+});
+
+describe("deletePortal with the gate closed", () => {
+  it("refuses and sends no request at all", async (t) => {
+    const sent = stubFetch(t, json({}));
+
+    await assert.rejects(() => deletePortal({ portalId: "p1" }), /MASV_ALLOW_DELETE/);
+    assert.equal(sent.count(), 0);
   });
 });
 
 describe("deletePortal with the gate open", () => {
-  const script = `
-    globalThis.fetch = async (url, init) => {
-      console.error(JSON.stringify({
-        url: String(url),
-        method: init.method,
-        apiKey: init.headers["x-api-key"],
-      }));
-      return new Response(null, { status: 204 });
-    };
-    const { deletePortal } = await import(${moduleUrl("src/api/portals.ts")});
-    console.log(JSON.stringify(await deletePortal({ portalId: "p1" })));
-  `;
+  it("sends DELETE with the team API key and needs no package token", async (t) => {
+    allowDelete(t);
+    const sent = stubFetch(t, noContent());
 
-  it("reports success for a 204 with no body", () => {
-    const r = runInChild(script, OPEN);
+    await deletePortal({ portalId: "p1" });
 
-    assert.equal(r.status, 0, r.stderr);
-    assert.deepEqual(JSON.parse(r.stdout), {
+    assert.equal(sent.count(), 1, "a portal delete is a single request");
+    assert.equal(sent.method(), "DELETE");
+    assert.match(sent.url(), /\/v1\/portals\/p1$/);
+    assert.equal(sent.headers()["x-api-key"], "test-key");
+  });
+
+  it("reports success for a 204 with no body", async (t) => {
+    allowDelete(t);
+    stubFetch(t, noContent());
+
+    assert.deepEqual(await deletePortal({ portalId: "p1" }), {
       success: true,
       message: "Portal deleted successfully",
     });
   });
 
-  it("sends DELETE with the team API key", () => {
-    const r = runInChild(script, OPEN);
-    const request = JSON.parse(r.stderr.trim().split("\n").at(-1) as string);
+  it("surfaces an API refusal rather than claiming success", async (t) => {
+    allowDelete(t);
+    stubFetch(t, json({ error: "portal has active uploads" }, 409));
 
-    assert.equal(request.method, "DELETE");
-    assert.match(request.url, /\/v1\/portals\/p1$/);
-    assert.equal(request.apiKey, "test-key");
+    await assert.rejects(() => deletePortal({ portalId: "p1" }), /409/);
   });
 });
 
-describe("delete failures", () => {
-  it("surfaces an API refusal rather than claiming success", () => {
-    const script = `
-      let call = 0;
-      globalThis.fetch = async () => {
-        call++;
-        if (call === 1) return Response.json({ id: "pkg1", access_token: "tok-abc" });
-        return Response.json({ error: "package is locked" }, { status: 409 });
-      };
-      const { deletePackage } = await import(${moduleUrl("src/api/packages.ts")});
-      await deletePackage({ packageId: "pkg1" });
-    `;
+describe("the gate closes again between tests", () => {
+  // Guards the cleanup above: a leaked MASV_ALLOW_DELETE would make the closed-gate
+  // tests pass or fail depending on file ordering, which is the worst kind of flake.
+  it("is closed by default", async (t) => {
+    const sent = stubFetch(t);
 
-    const r = runInChild(script, OPEN);
-
-    assert.notEqual(r.status, 0, "a refused delete must not resolve");
-    assert.match(r.stderr, /409/);
-    assert.match(r.stderr, /package is locked/);
+    await assert.rejects(() => deletePortal({ portalId: "p1" }), /MASV_ALLOW_DELETE/);
+    assert.equal(sent.count(), 0);
   });
 });
