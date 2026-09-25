@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { MASV_BASE_URL, MASV_TEAM_ID, MASV_API_KEY } from "./env.js";
+import { MASV_BASE_URL, MASV_TEAM_ID, MASV_API_KEY } from "./env.ts";
+import { masvFetch } from "./fetch.ts";
 
 const GetActivitiesSchema = z.object({
   page: z.number().min(1).describe("Page number of paginated response. First page is 1").optional(),
@@ -49,7 +50,7 @@ const GetActivitiesSchema = z.object({
 
 type GetActivitiesParams = z.infer<typeof GetActivitiesSchema>;
 
-async function getActivities({ page, ...params }: GetActivitiesParams) {
+async function getActivities(params: GetActivitiesParams) {
   const url = new URL(`${MASV_BASE_URL}/v1.1/teams/${MASV_TEAM_ID}/activities`);
 
   Object.entries(params).forEach(([key, value]) => {
@@ -63,8 +64,7 @@ async function getActivities({ page, ...params }: GetActivitiesParams) {
     "x-api-key": MASV_API_KEY,
   };
 
-  const r = await fetch(url.toString(), { headers });
-  const data = await r.json();
+  const data = await masvFetch(url, { headers });
 
   const additionalContext = getActivitiesInformation();
   data.activities_description = additionalContext;
@@ -86,10 +86,7 @@ async function getActivityEvents({ activityId }: GetActivityEventsParams) {
     "x-api-key": MASV_API_KEY,
   };
 
-  const r = await fetch(url.toString(), { headers });
-  const data = await r.json();
-
-  return data;
+  return masvFetch(url, { headers });
 }
 
 function getActivitiesInformation() {

@@ -10,6 +10,13 @@ MASV is an easy-to-use and ultra-reliable managed file transfer service designed
 
 Learn more https://masv.io/
 
+## Requirements
+
+**Node.js 24 or newer.** The published package is plain JavaScript compiled to ES2024, so no
+transpilation or polyfills are needed. Node 24 is the version the project is built and tested against, and
+the one the test suite requires — it imports the TypeScript sources directly using Node's built-in type
+stripping.
+
 ## Installation
 
 The server can be run directly with `npx` without installation, or installed globally if preferred:
@@ -88,8 +95,7 @@ The server provides the following tools for LLM interaction:
 
 - `get_integrations` - List connected storage integrations
 - `send_package_to_integration` - Transfer package to connected storage
-- `list_files_on_integration` - Browse files on cloud integrations
-- `list_files_on_storage_gateway` - Browse files on Storage Gateway
+- `list_files_on_integration` - Browse files on cloud integrations and MASV Storage Gateway
 - `transfer_files_from_integration` - Transfer files from storage to MASV (works with both cloud and MASV Storage Gateway)
 
 ### Team Management
@@ -125,6 +131,21 @@ npm run format
 ```
 
 Prettier with a 100 column width. CI runs `npm run format:check` and fails on unformatted files.
+
+### Test
+
+```
+npm test
+```
+
+Runs the offline suite with Node's built-in test runner. It needs no MASV credentials
+and makes no network calls, so it runs on every pull request. `npm run build` first if
+you have not already — some tests spawn the built server to inspect its tool surface.
+
+Relative imports inside `src/` are written with `.ts` extensions so that Node can run
+the sources directly; `tsc` rewrites them to `.js` on emit. Keep new imports in that
+form, and note that Node's type stripping rules out TypeScript `enum`, `namespace`, and
+constructor parameter properties.
 
 ### Use MCP server
 

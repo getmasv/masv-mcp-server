@@ -66,6 +66,15 @@ jobs:
       - name: Bundle and verify contents
         run: npm run bundle
 
+      # Deliberately after the bundle step rather than next to Typecheck, where it
+      # would read more naturally: the tool-surface tests spawn build/index.js as a
+      # subprocess, so they need a build to exist. `npm run bundle` provides it.
+      #
+      # This suite needs no credentials and makes no network calls, so it runs in
+      # full on fork PRs — which is the whole point of keeping it offline.
+      - name: Test
+        run: npm test
+
       # Lets a reviewer inspect exactly what this PR would ship.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
