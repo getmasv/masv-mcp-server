@@ -5,10 +5,16 @@ How to write and run tests in this repo.
 ## Run
 
 ```bash
-npm run build && npm test     # offline suite. no credentials, no network
+npm test                      # offline suite. no credentials, no network
 ```
 
-Build first: some tests spawn `build/index.js`. Run `npm test` before declaring work done.
+Run it before declaring work done. **No build step is needed** — everything, including the tests that
+spawn the server as a subprocess, runs straight from TypeScript under Node's type stripping.
+
+Keep it that way. Pointing a test at `build/index.js` reintroduces a dependency that fails in the worst
+possible way: a stale build does not error, it passes against code that is no longer in `src/`, so adding a
+tool without recompiling would leave the manifest-parity test green. The emit step is covered by
+`npm run bundle` in CI and by the release scripts instead.
 
 ```bash
 npm run test:coverage         # same suite, plus a per-file report for src/
@@ -18,14 +24,19 @@ Coverage is a "what did I forget" pass, not a target. **There is no coverage gat
 one** — a number says nothing about whether the cases you wrote were the right ones. Read the uncovered
 lines and decide whether each is a case you forgot or code nobody needs.
 
-Two details in that command worth knowing, since both were needed to make the report mean anything:
+Two details in that command worth knowing:
 
-- `--test-coverage-include='src/**'` scopes it to production code. Without it the report also covers the
-  test files, and more confusingly `build/`: `test/tools/surface.test.ts` spawns `build/index.js`, the child
-  process inherits coverage collection, and the compiled output then double-counts against `src/` and drags
-  the totals down. That is why an unscoped run reports ~75% while every `src/` file is at 100%.
+- `--test-coverage-include='src/**'` scopes the report to production code. Without it the test files are
+  measured too, which answers a question nobody asked.
 - `--experimental-test-coverage` is Stability 1, so the flag name and the report format are exempt from
   semver and a Node bump can change them. Fine for a local tool; another reason not to gate on it.
+
+`src/index.ts` reports well below the rest and that figure is honest, not an artefact. The subprocess that
+`surface.test.ts` spawns inherits coverage collection, so registering the 20 tools is counted, but the
+handler bodies are not — nothing calls a tool through the server. Each one is a thin
+`try { … return mcpOk(data) } catch { return mcpError(error) }` wrapper around an API function that is
+itself fully covered, so the untested part is the wiring. Covering it would mean driving `tools/call` over
+the MCP client, which reaches real `fetch` in the child with no stub available.
 
 Node can enforce thresholds with `--test-coverage-lines`, `--test-coverage-branches` and
 `--test-coverage-functions`. Deliberately unused.
@@ -36,7 +47,7 @@ Node can enforce thresholds with `--test-coverage-lines`, `--test-coverage-branc
 test/
   setup.ts              dummy MASV_* env, loaded via --import before any test module
   helpers/
-    mcp-client.ts       spawns build/index.js, returns tools/list
+    mcp-client.ts       spawns src/index.ts, returns tools/list
 
     fetch-stub.ts       stubs globalThis.fetch and records what was sent
   unit/<domain>.test.ts one file per src/api/ module
@@ -216,8 +227,8 @@ If a suite ever genuinely needs concurrency, keep the env-mutating tests in thei
 file sequential.
 
 The one thing left that needs a separate process is the server's own startup, because `src/index.ts`
-connects a transport at module top level and cannot be imported. `test/tools/surface.test.ts` spawns the
-built `build/index.js` for that — a real file, with no code passed as a string.
+connects a transport at module top level and cannot be imported. `test/tools/surface.test.ts` spawns
+`src/index.ts` for that — a real file, with no code passed as a string.
 
 ## Import specifiers: `.ts`, not `.js`
 
@@ -261,7 +272,7 @@ surface as failing tests. Editors resolve types normally.
 
 ## Adding a tool
 
-`test/tools/surface.test.ts` enumerates the real surface by spawning `build/index.js` and calling
+`test/tools/surface.test.ts` enumerates the real surface by spawning `src/index.ts` and calling
 `tools/list` over an MCP client, the way `scripts/smithery-payload.mjs` does. `src/index.ts` connects a
 transport at module top level, so it is not importable; the subprocess is deliberate and makes these
 end-to-end checks of what we actually ship.

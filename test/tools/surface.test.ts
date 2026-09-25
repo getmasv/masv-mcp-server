@@ -17,7 +17,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { listRegisteredTools } from "../helpers/mcp-client.ts";
+import { SERVER_ENTRY, listRegisteredTools } from "../helpers/mcp-client.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -130,7 +130,7 @@ describe("startup", () => {
   // Spawned rather than imported: src/index.ts connects a transport at module top
   // level, so importing it would attach a server to the test process's own stdio.
   function boot(env: Record<string, string>) {
-    return spawnSync(process.execPath, [resolve(ROOT, "build/index.js")], {
+    return spawnSync(process.execPath, [SERVER_ENTRY], {
       env: { PATH: process.env.PATH ?? "", NO_COLOR: "1", ...env },
       encoding: "utf8",
       timeout: 10_000,

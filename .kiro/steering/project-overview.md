@@ -64,8 +64,8 @@ scripts/              Build & publish scripts (bundle, Smithery release).
 - `npm run build` — typecheck + compile. Run before declaring work done.
 - `npm run inspector` — launch MCP Inspector against the built server.
 - `npm run bundle` — build + pack `.mcpb`.
-- `npm test` — offline test suite, no credentials, no network. Build first; some tests spawn
-  `build/index.js`. Run it before declaring work done. See `testing.md`.
+- `npm test` — offline test suite, no credentials, no network, no build step. Run it before declaring work
+  done. See `testing.md`.
 - `npm run test:coverage` — same suite plus a per-file report for `src/`. A local tool for finding gaps;
   there is no coverage gate in CI.
 - `npm run format` / `npm run format:check` — Prettier, `printWidth: 100`. CI fails on unformatted
