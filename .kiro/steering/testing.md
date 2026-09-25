@@ -103,8 +103,9 @@ Rules:
 The approach is specification-based, from Aniche's _Effective Software Testing_: derive cases from each
 function's contract, not from its lines. Coverage comes afterwards, as a check on what you forgot (ch. 2
 and 3). Also from the book: stub at the boundary you don't own and don't mock what you do own (ch. 6), and
-solve testability with the smallest change that removes the obstacle rather than a refactor (ch. 7) —
-which is why a child process stands in for reloading `env.ts`.
+design for testability, treating an obstacle to testing as a design problem rather than something to work
+around (ch. 7) — which is why `env.ts` reads the environment at the point of use instead of caching it in
+constants that only a second process could change.
 
 Where the book fits this codebase less well: it is mostly about unit-testing business logic, and this is
 an adapter with almost none. The cases that find real defects here are contract-shaped — did the right
@@ -156,15 +157,16 @@ Both matter, in different places, so it is worth knowing which one is reachable:
 
 ## Environment
 
-`test/setup.ts` sets the dummy env before the module graph loads. It must exist because
-`src/api/env.ts` validates at import time — every API module throws without it.
+`test/setup.ts` provides the dummy env, loaded with `--import` before any test module. It must exist
+because `teamId()` and `apiKey()` throw when their variables are unset, so any code path that builds a
+request needs them present.
 
 - Base URL is `https://api.test.invalid`. `.invalid` cannot resolve, so a request that escapes its stub
   fails as a DNS error instead of reaching a real host.
 - Values are forced, not defaulted, so the suite behaves the same on a machine with real `MASV_*`
   exported.
-- `MASV_ALLOW_DELETE` is cleared, so the delete gate is closed. `env.ts` reads it once at import, so a
-  test cannot flip it mid-run.
+- `MASV_ALLOW_DELETE` is cleared, so the delete gate starts closed. A test that needs it open sets the
+  variable and restores it; `deleteAllowed()` reads it per call.
 
 **Configuration is read at the point of use, which is what keeps it testable.** The accessors in `env.ts`
 — `baseUrl()`, `teamId()`, `apiKey()`, `deleteAllowed()` — read `process.env` on every call instead of
@@ -187,6 +189,31 @@ Two rules when doing this:
 
 Do not add a module constant that caches an environment value. It reintroduces the problem this design
 exists to avoid, and the only way to test around it is reloading the module in a separate process.
+
+### Mutating process.env is only safe because of how the runner schedules tests
+
+`process.env` is shared state, so the pattern above depends on two guarantees. Both are `node --test`
+defaults rather than anything the tests arrange, which makes them easy to break without noticing.
+
+**One process per file, files in parallel.** Each test file gets its own child process, so its
+`process.env` is private and no file can disturb another. Concurrency defaults to the CPU count.
+
+**Tests within a file run sequentially.** Nothing else in the file is running while a test holds a modified
+environment, and `t.after()` restores it before the next test starts.
+
+Two things therefore must not happen:
+
+- **Never put `concurrency: true` on a suite that touches `process.env`.** Its tests then interleave and
+  clobber each other's variables. It does not fail cleanly either — in a three-test probe, two failed and
+  one passed, so it reads as a flake rather than a design error. `withEnv` also clears every `MASV_*`
+  variable, so a concurrent test in the same file would find no credentials and `teamId()` would throw.
+- **Never run the suite with `--test-isolation=none`.** That puts every file in one process, and the suite
+  fails today: eight assertions break on a wrong team id, because `env.test.ts` sets `MASV_TEAM_ID=t` while
+  other files expect `test-team`. The flag is experimental and tempting as a speed-up; the offline suite
+  finishes in under a second anyway.
+
+If a suite ever genuinely needs concurrency, keep the env-mutating tests in their own file and leave that
+file sequential.
 
 The one thing left that needs a separate process is the server's own startup, because `src/index.ts`
 connects a transport at module top level and cannot be imported. `test/tools/surface.test.ts` spawns the

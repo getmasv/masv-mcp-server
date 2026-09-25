@@ -32,8 +32,8 @@ async function spawnAndList() {
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [SERVER],
-    // env.ts validates at import time; test/setup.ts has already put dummy values
-    // in process.env. No API call is made by tools/list.
+    // The server checks its credentials at startup; test/setup.ts has already put
+    // dummy values in process.env. No API call is made by tools/list.
     env: { ...process.env } as Record<string, string>,
     stderr: "pipe",
   });

@@ -1,7 +1,7 @@
 // Loaded via `node --test --import ./test/setup.ts` before any test module.
 //
-// src/api/env.ts validates at import time and throws when MASV_TEAM_ID or
-// MASV_API_KEY are missing, so every API module is unimportable without this.
+// teamId() and apiKey() in src/api/env.ts throw when their variables are unset, so
+// any code path that builds a request needs these present.
 //
 // The values are forced, not defaulted. `npm test` must stay credential-free and
 // offline even on a machine that exports real MASV_* vars in its shell; inheriting
@@ -16,6 +16,6 @@ process.env.MASV_BASE_URL = "https://api.test.invalid";
 process.env.MASV_TEAM_ID = "test-team";
 process.env.MASV_API_KEY = "test-key";
 
-// Cleared so the delete gate is closed by default. env.ts reads this once at import
-// time, so a test cannot flip it mid-run; opening the gate needs a subprocess.
+// Cleared so the delete gate starts closed. deleteAllowed() reads it per call, so a
+// test that needs it open sets the variable and restores it in t.after().
 delete process.env.MASV_ALLOW_DELETE;
