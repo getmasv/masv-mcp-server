@@ -48,9 +48,15 @@ four one-time channels report the new version before trusting them to keep thems
 
 ## Version Invariant
 
-`package.json`, `manifest.json`, `server.json`, and `src/index.ts` must all carry the same version. They
-drift easily because nothing currently checks them, and the MCP registry rejects a version that doesn't
-match npm. CI should enforce this rather than a human remembering.
+`package.json`, `package-lock.json`, `manifest.json`, `server.json`, and `src/index.ts` must all carry the
+same version — seven fields across five files, since `server.json` and `package-lock.json` each hold it
+twice. They drift easily, and the MCP registry rejects a version that doesn't match npm.
+
+`scripts/check-versions.sh` enforces it, and both `ci.yml` and `release.yml` run it, so a human does not
+have to remember. Add any new file that carries the version to that script in the same change — a field it
+does not know about is a field nothing checks. `package-lock.json` was the case that proved it: `npm ci`
+validates the lockfile against package.json's _dependencies_ only, so a stale root version there passed
+every job in the pipeline and was later rewritten by an unrelated `npm install`.
 
 ## Listing Requirements To Build Against
 

@@ -2,10 +2,17 @@
 #
 # Asserts that every place a version or identity is written agrees.
 #
-# Four files carry the version and nothing checked they matched, so they drifted
+# Five files carry the version and nothing checked they matched, so they drifted
 # easily. The MCP Registry rejects a version that disagrees with npm, and npm
 # versions are immutable — so a mismatch discovered after `npm publish` burns a
 # version number. This runs before anything is published.
+#
+# package-lock.json is included because nothing else catches it: `npm ci` validates
+# the lockfile against package.json's *dependencies* only and is perfectly happy
+# with a root version that disagrees, so a stale lock version survives the whole
+# pipeline. It then gets rewritten by whoever next runs `npm install`, landing a
+# confusing version bump in an unrelated PR. It carries the version twice — the
+# top-level field and the root package entry — and `npm version` updates both.
 #
 # Usage:
 #   bash scripts/check-versions.sh                 # consistency only
@@ -67,19 +74,28 @@ index_version() {
 echo "==> Versions"
 
 PKG_VERSION=$(json package.json version)
+# The trailing dot is the empty-string key: package-lock.json stores the root
+# package under "" in .packages. json() splits on "." so 'packages..version'
+# reads .packages[""].version.
+LOCK_VERSION=$(json package-lock.json version)
+LOCK_ROOT_VERSION=$(json package-lock.json packages..version)
 MANIFEST_VERSION=$(json manifest.json version)
 SERVER_VERSION=$(json server.json version)
 SERVER_PKG_VERSION=$(json server.json packages.0.version)
 INDEX_VERSION=$(index_version)
 
-printf '  package.json            %s\n' "$PKG_VERSION"
-printf '  manifest.json           %s\n' "$MANIFEST_VERSION"
-printf '  server.json .version    %s\n' "$SERVER_VERSION"
-printf '  server.json .packages[0] %s\n' "$SERVER_PKG_VERSION"
-printf '  src/index.ts            %s\n' "$INDEX_VERSION"
+printf '  %-32s %s\n' 'package.json .version' "$PKG_VERSION"
+printf '  %-32s %s\n' 'package-lock.json .version' "$LOCK_VERSION"
+printf '  %-32s %s\n' 'package-lock.json .packages[""]' "$LOCK_ROOT_VERSION"
+printf '  %-32s %s\n' 'manifest.json .version' "$MANIFEST_VERSION"
+printf '  %-32s %s\n' 'server.json .version' "$SERVER_VERSION"
+printf '  %-32s %s\n' 'server.json .packages[0]' "$SERVER_PKG_VERSION"
+printf '  %-32s %s\n' 'src/index.ts' "$INDEX_VERSION"
 echo
 
 for pair in \
+  "package-lock.json .version:$LOCK_VERSION" \
+  "package-lock.json .packages[\"\"].version:$LOCK_ROOT_VERSION" \
   "manifest.json:$MANIFEST_VERSION" \
   "server.json .version:$SERVER_VERSION" \
   "server.json .packages[0].version:$SERVER_PKG_VERSION" \
