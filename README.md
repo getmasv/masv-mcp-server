@@ -136,11 +136,12 @@ Prettier with a 100 column width. CI runs `npm run format:check` and fails on un
 
 ```
 npm test
+npm run test:coverage
 ```
 
 Runs the offline suite with Node's built-in test runner. It needs no MASV credentials
-and makes no network calls, so it runs on every pull request. `npm run build` first if
-you have not already — some tests spawn the built server to inspect its tool surface.
+and makes no network calls, so it runs on every pull request, and it needs no build step
+because Node runs the TypeScript sources directly.
 
 Relative imports inside `src/` are written with `.ts` extensions so that Node can run
 the sources directly; `tsc` rewrites them to `.js` on emit. Keep new imports in that

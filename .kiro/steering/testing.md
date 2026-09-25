@@ -5,54 +5,96 @@ How to write and run tests in this repo.
 ## Run
 
 ```bash
-npm run build && npm test     # offline suite. no credentials, no network
+npm test                      # offline suite. no credentials, no network
 ```
 
-Build first: some tests spawn `build/index.js`. Run `npm test` before declaring work done.
+Run it before declaring work done. **No build step is needed** — everything, including the tests that
+spawn the server as a subprocess, runs straight from TypeScript under Node's type stripping.
 
-For a "what did I forget" pass: `node --test --experimental-test-coverage --import ./test/setup.ts
-'test/{unit,tools}/**/*.test.ts'`. There is no coverage gate and should not be one.
+Keep it that way. Pointing a test at `build/index.js` reintroduces a dependency that fails in the worst
+possible way: a stale build does not error, it passes against code that is no longer in `src/`, so adding a
+tool without recompiling would leave the manifest-parity test green. The emit step is covered by
+`npm run bundle` in CI and by the release scripts instead.
+
+```bash
+npm run test:coverage         # same suite, plus a per-file report for src/
+```
+
+Coverage is a "what did I forget" pass, not a target. **There is no coverage gate in CI and should not be
+one** — a number says nothing about whether the cases you wrote were the right ones. Read the uncovered
+lines and decide whether each is a case you forgot or code nobody needs.
+
+Two details in that command worth knowing:
+
+- `--test-coverage-include='src/**'` scopes the report to production code. Without it the test files are
+  measured too, which answers a question nobody asked.
+- `--experimental-test-coverage` is Stability 1, so the flag name and the report format are exempt from
+  semver and a Node bump can change them. Fine for a local tool; another reason not to gate on it.
+
+`src/index.ts` reports well below the rest and that figure is honest, not an artefact. The subprocess that
+`surface.test.ts` spawns inherits coverage collection, so registering the 20 tools is counted, but the
+handler bodies are not — nothing calls a tool through the server. Each one is a thin
+`try { … return mcpOk(data) } catch { return mcpError(error) }` wrapper around an API function that is
+itself fully covered, so the untested part is the wiring. Covering it would mean driving `tools/call` over
+the MCP client, which reaches real `fetch` in the child with no stub available.
+
+Node can enforce thresholds with `--test-coverage-lines`, `--test-coverage-branches` and
+`--test-coverage-functions`. Deliberately unused.
 
 ## Where a test goes
 
 ```
 test/
   setup.ts              dummy MASV_* env, loaded via --import before any test module
-  helpers/              shared spawn/client plumbing
+  helpers/
+    mcp-client.ts       spawns src/index.ts, returns tools/list
+
+    fetch-stub.ts       stubs globalThis.fetch and records what was sent
   unit/<domain>.test.ts one file per src/api/ module
-  tools/surface.test.ts the registered tool surface: annotations, doc parity
+  unit/delete.test.ts   the delete tools, both sides of the gate
+  tools/surface.test.ts the registered tool surface: annotations, manifest parity, startup
   integration/          live API, self-skips without credentials
 ```
+
+One file per `src/api/` module, until a module holds several unrelated tools and the file stops being
+readable. Then split by tool and keep the module prefix so they stay adjacent —
+`integrations.test.ts`, `integrations-list.test.ts`, `integrations-transfer.test.ts`. Roughly 200 lines is
+where a file starts being worth splitting.
 
 Default to `test/unit/`. Use `test/integration/` only for a question the real API is the sole authority
 on — array serialization format, whether an endpoint accepts a partial body, real status codes.
 
 ## Write a unit test
 
-`node:test` + `node:assert/strict`. No other dependencies, no mock harness — the runner is one.
+`node:test` + `node:assert/strict`. No other dependencies, and no mocking framework — the runner is one.
 
-Stub `globalThis.fetch`. Every API module calls bare `fetch`, so that one seam covers every tool with no
-production change. `t.mock.method` restores the original when the test ends.
+Stub `globalThis.fetch` through `test/helpers/fetch-stub.ts`. Every API module calls bare `fetch`, so that
+one seam covers every tool with no production change, and `t.mock.method` underneath restores the original
+when the test ends.
 
 ```ts
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { getPackages } from "../../src/api/packages.ts";
+import { getPackageFiles } from "../../src/api/packages.ts";
+import { json, stubFetch } from "../helpers/fetch-stub.ts";
 
-it("forwards page to the query string", async (t) => {
-  const f = t.mock.method(globalThis, "fetch", async () => Response.json({ packages: [] }));
+it("authenticates with the package token, not the API key", async (t) => {
+  const sent = stubFetch(t, json({ id: "pkg1", access_token: "tok" }), json({ files: [] }));
 
-  await getPackages({ page: 3, limit: 10 });
+  await getPackageFiles({ packageId: "pkg1" });
 
-  const [url, init] = f.mock.calls[0].arguments as [string, RequestInit];
-  assert.match(url, /page=3/);
-  assert.equal(f.mock.callCount(), 1);
+  assert.equal(sent.headers(1)["x-package-token"], "tok");
+  assert.equal(sent.headers(1)["x-api-key"], undefined);
 });
 ```
 
-Assert on what the request carried — URL, query params, method, headers, body — and on how a response is
-mapped to a tool result. That is where this codebase's defects live; it is an adapter with almost no
-business logic.
+Each argument to `stubFetch` answers one request, in order, and an unstubbed call fails loudly — so a
+test declares every request it expects and an extra one is caught. Replies are `json`, `html`,
+`noContent`, `emptyBody`, or any function returning a `Response` for an odd case. The reply is a function
+because a `Response` body can only be read once.
+
+`sent` names the recorded fields: `url`, `method`, `headers`, `requestJson`, `count`, each taking a
+0-based call index. Prefer them over reaching into `f.mock.calls[…].arguments`.
 
 Rules:
 
@@ -61,22 +103,132 @@ Rules:
   underneath it and its status handling applies, which makes an error-path test a two-liner.
 - **No recorded fixtures.** Where response shape is load-bearing, hand-write a five-line stub stating the
   contract you rely on.
-- **Cover both sides of every branch**, not just the happy one: gate open/closed, param present/absent,
-  cursor present/absent, 2xx/4xx/5xx, JSON body and non-JSON body.
-- **Two-hop tools need two stub responses.** Anything reading a package token fetches the package first;
-  assert the second request carries `x-package-token`, not `x-api-key`.
+- **Assert `count()` when a call should not happen.** Argument validation and the delete gate are only
+  worth anything if they run before the request, and a passing rejection test does not prove that.
+- **Two-hop tools need two replies.** Anything reading a package token fetches the package first; assert
+  the second request carries `x-package-token`, not `x-api-key`, and that a failed first hop stops the
+  second from firing.
+
+## Choosing what to test
+
+The approach is specification-based, from Aniche's _Effective Software Testing_: derive cases from each
+function's contract, not from its lines. Coverage comes afterwards, as a check on what you forgot (ch. 2
+and 3). Also from the book: stub at the boundary you don't own and don't mock what you do own (ch. 6), and
+design for testability, treating an obstacle to testing as a design problem rather than something to work
+around (ch. 7) — which is why `env.ts` reads the environment at the point of use instead of caching it in
+constants that only a second process could change.
+
+Where the book fits this codebase less well: it is mostly about unit-testing business logic, and this is
+an adapter with almost none. The cases that find real defects here are contract-shaped — did the right
+request go out, is the response mapped faithfully — so that is where to spend effort.
+
+A workable order for a new function:
+
+1. **Write down the contract.** Parameters and their optionality, what the request should look like, what
+   the result should contain, what should fail.
+2. **Partition each parameter and take the boundaries.** `formatFileSize` gets 0, 1023, 1024, and the TiB
+   clamp, because every defect in a unit-conversion loop lives at a boundary. An enum-like parameter gets
+   every value if the set is small — that is how the storage-gateway provider list is covered.
+3. **Cross the parameters that interact.** `unlimited_storage` × `expiry` is four combinations, two of
+   which must be rejected. Cursor present/absent × provider type is four paths through one tool.
+4. **Add the failure modes of the boundary you don't own**: 4xx with a JSON body, 5xx with HTML, an empty
+   body, a field the API omitted.
+5. **Then run coverage** and ask what the uncovered lines mean. Every gap is either a case you forgot or
+   code nobody needs.
+
+Five defect patterns have actually been found in this repo. They are worth checking for by name in
+anything new:
+
+- **Silent pagination loss.** A dropped `page`, a cursor encoding an empty path, an offset that jumps
+  further than the page returned. All produce a plausible wrong answer and no error, which is the worst
+  possible outcome for an agent that cannot tell.
+- **An error body read as data.** Any code path that returns without checking status hands the model an
+  error to report as a result.
+- **A fabricated auth value.** Reading `access_token` off a response nobody checked sends
+  `x-package-token: undefined` on the next hop and fails somewhere unrelated. Assert the error names the
+  step that actually failed.
+- **Parameter serialization.** Array params must be comma-joined; MASV does not filter on a repeated key,
+  so the wrong form returns an unfiltered list and reports nothing.
+- **Validation after I/O.** A guard that runs after the first request still costs a round trip and reports
+  the wrong problem. `count()` is what proves the order.
+
+## null, undefined, and missing fields
+
+Both matter, in different places, so it is worth knowing which one is reachable:
+
+- **Response bodies cannot contain `undefined`.** JSON has no such value and `JSON.parse` never produces
+  one. So for a payload, test `null` and test a **missing property** — the latter is what reads as
+  `undefined` in our code. `masvFetch` returns `null` for 204 and for an empty body, never `undefined`.
+- **Tool arguments can be `undefined`.** Optional zod fields arrive that way, and the query-string
+  builders skip a value only when it is exactly `undefined`. Pass `undefined` explicitly and assert the
+  key is absent rather than serialized as `"undefined"`.
+- **Check the falsy values that are not empty.** `0` and `""` and `false` are the ones that get lost to a
+  truthiness check: a zero-byte file must report `0 B` rather than "unknown", `active: false` must survive
+  into a portal update body, and an empty-string token must be rejected rather than sent.
 
 ## Environment
 
-`test/setup.ts` sets the dummy env before the module graph loads. It must exist because
-`src/api/env.ts` validates at import time — every API module throws without it.
+`test/setup.ts` provides the dummy env, loaded with `--import` before any test module. It must exist
+because `teamId()` and `apiKey()` throw when their variables are unset, so any code path that builds a
+request needs them present.
 
 - Base URL is `https://api.test.invalid`. `.invalid` cannot resolve, so a request that escapes its stub
   fails as a DNS error instead of reaching a real host.
 - Values are forced, not defaulted, so the suite behaves the same on a machine with real `MASV_*`
   exported.
-- `MASV_ALLOW_DELETE` is cleared, so the delete gate is closed. `env.ts` reads it once at import, so a
-  test cannot flip it mid-run — opening the gate needs a subprocess.
+- `MASV_ALLOW_DELETE` is cleared, so the delete gate starts closed. A test that needs it open sets the
+  variable and restores it; `deleteAllowed()` reads it per call.
+
+**Configuration is read at the point of use, which is what keeps it testable.** The accessors in `env.ts`
+— `baseUrl()`, `teamId()`, `apiKey()`, `deleteAllowed()` — read `process.env` on every call instead of
+caching values in module constants, so any environment case is an ordinary in-process test: set the
+variables, call the code, restore. Set a variable and the next call sees it; there is nothing to reload.
+
+```ts
+function withEnv(t: TestContext, vars: Record<string, string>) {
+  // clear every MASV_* var, apply `vars`, restore in t.after()
+}
+```
+
+Two rules when doing this:
+
+- **Clear the whole `MASV_*` set before applying yours.** Otherwise a test inherits whatever `setup.ts` or
+  a previous test left behind, and the result depends on file ordering.
+- **Restore in `t.after()`,** not at the end of the body, so a failing assertion cannot leak state into the
+  next test. `test/unit/delete.test.ts` ends with a test asserting the gate is closed by default, which is
+  cheap insurance against exactly that leak.
+
+Do not add a module constant that caches an environment value. It reintroduces the problem this design
+exists to avoid, and the only way to test around it is reloading the module in a separate process.
+
+### Mutating process.env is only safe because of how the runner schedules tests
+
+`process.env` is shared state, so the pattern above depends on two guarantees. Both are `node --test`
+defaults rather than anything the tests arrange, which makes them easy to break without noticing.
+
+**One process per file, files in parallel.** Each test file gets its own child process, so its
+`process.env` is private and no file can disturb another. Concurrency defaults to the CPU count.
+
+**Tests within a file run sequentially.** Nothing else in the file is running while a test holds a modified
+environment, and `t.after()` restores it before the next test starts.
+
+Two things therefore must not happen:
+
+- **Never put `concurrency: true` on a suite that touches `process.env`.** Its tests then interleave and
+  clobber each other's variables. It does not fail cleanly either — in a three-test probe, two failed and
+  one passed, so it reads as a flake rather than a design error. `withEnv` also clears every `MASV_*`
+  variable, so a concurrent test in the same file would find no credentials and `teamId()` would throw.
+- **Never run the suite with `--test-isolation=none`.** That puts every file in one process, and the suite
+  fails today: eight assertions break on a wrong team id, because `env.test.ts` sets `MASV_TEAM_ID=t` while
+  other files expect `test-team`. The flag is experimental and tempting as a speed-up; the offline suite
+  finishes in under a second anyway.
+
+If a suite ever genuinely needs concurrency, keep the env-mutating tests in their own file and leave that
+file sequential.
+
+The one thing left that needs a separate process is the server's own startup, because `src/index.ts`
+connects a transport at module top level and cannot be imported. `test/tools/surface.test.ts` spawns
+`src/index.ts` for that — a real file, with no code passed as a string.
 
 ## Import specifiers: `.ts`, not `.js`
 
@@ -120,7 +272,7 @@ surface as failing tests. Editors resolve types normally.
 
 ## Adding a tool
 
-`test/tools/surface.test.ts` enumerates the real surface by spawning `build/index.js` and calling
+`test/tools/surface.test.ts` enumerates the real surface by spawning `src/index.ts` and calling
 `tools/list` over an MCP client, the way `scripts/smithery-payload.mjs` does. `src/index.ts` connects a
 transport at module top level, so it is not importable; the subprocess is deliberate and makes these
 end-to-end checks of what we actually ship.

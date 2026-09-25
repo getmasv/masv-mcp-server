@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MASV_BASE_URL, MASV_TEAM_ID, MASV_API_KEY, MASV_ALLOW_DELETE } from "./env.ts";
+import { apiKey, baseUrl, deleteAllowed, teamId } from "./env.ts";
 import { masvFetch } from "./fetch.ts";
 
 const GetPortalsSchema = z.object({
@@ -26,7 +26,7 @@ const GetPortalsSchema = z.object({
 type GetPortalsParams = z.infer<typeof GetPortalsSchema>;
 
 async function getPortals({ page, limit, sort, ...params }: GetPortalsParams) {
-  const url = new URL(`${MASV_BASE_URL}/v1.1/teams/${MASV_TEAM_ID}/portals`);
+  const url = new URL(`${baseUrl()}/v1.1/teams/${teamId()}/portals`);
 
   if (page !== undefined) url.searchParams.append("page", String(page));
   if (limit !== undefined) url.searchParams.append("limit", String(limit));
@@ -34,17 +34,16 @@ async function getPortals({ page, limit, sort, ...params }: GetPortalsParams) {
 
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined) {
-      if (Array.isArray(value)) {
-        value.forEach((v) => url.searchParams.append(key, String(v)));
-      } else {
-        url.searchParams.append(key, String(value));
-      }
+      // MASV expects comma-separated lists (tags=a,b). Repeating the key does not
+      // filter, so the caller silently gets an unfiltered list back. String() on an
+      // array produces the comma form, which is how the other modules serialise.
+      url.searchParams.append(key, String(value));
     }
   });
 
   const headers = {
     "content-type": "application/json",
-    "x-api-key": MASV_API_KEY,
+    "x-api-key": apiKey(),
   };
 
   return masvFetch(url, { headers });
@@ -57,11 +56,11 @@ const GetPortalSchema = z.object({
 type GetPortalParams = z.infer<typeof GetPortalSchema>;
 
 async function getPortal({ portalId }: GetPortalParams) {
-  const url = new URL(`${MASV_BASE_URL}/v1.1/portals/${portalId}`);
+  const url = new URL(`${baseUrl()}/v1.1/portals/${portalId}`);
 
   const headers = {
     "content-type": "application/json",
-    "x-api-key": MASV_API_KEY,
+    "x-api-key": apiKey(),
   };
 
   return masvFetch(url, { headers });
@@ -228,11 +227,11 @@ const CreatePortalSchema = z.object({
 type CreatePortalParams = z.infer<typeof CreatePortalSchema>;
 
 async function createPortal(params: CreatePortalParams) {
-  const url = new URL(`${MASV_BASE_URL}/v1/teams/${MASV_TEAM_ID}/portals`);
+  const url = new URL(`${baseUrl()}/v1/teams/${teamId()}/portals`);
 
   const headers = {
     "content-type": "application/json",
-    "x-api-key": MASV_API_KEY,
+    "x-api-key": apiKey(),
   };
 
   return masvFetch(url, {
@@ -402,11 +401,11 @@ const UpdatePortalSchema = z.object({
 type UpdatePortalParams = z.infer<typeof UpdatePortalSchema>;
 
 async function updatePortal({ portalId, ...params }: UpdatePortalParams) {
-  const url = new URL(`${MASV_BASE_URL}/v1/portals/${portalId}`);
+  const url = new URL(`${baseUrl()}/v1/portals/${portalId}`);
 
   const headers = {
     "content-type": "application/json",
-    "x-api-key": MASV_API_KEY,
+    "x-api-key": apiKey(),
   };
 
   return masvFetch(url, {
@@ -423,17 +422,17 @@ const DeletePortalSchema = z.object({
 type DeletePortalParams = z.infer<typeof DeletePortalSchema>;
 
 async function deletePortal({ portalId }: DeletePortalParams) {
-  if (!MASV_ALLOW_DELETE) {
+  if (!deleteAllowed()) {
     throw new Error(
       "Delete operations are not allowed. Set MASV_ALLOW_DELETE=true in environment variables to enable.",
     );
   }
 
-  const url = new URL(`${MASV_BASE_URL}/v1/portals/${portalId}`);
+  const url = new URL(`${baseUrl()}/v1/portals/${portalId}`);
 
   const headers = {
     "content-type": "application/json",
-    "x-api-key": MASV_API_KEY,
+    "x-api-key": apiKey(),
   };
 
   // A successful delete answers 204 with no body, which masvFetch reports as null.

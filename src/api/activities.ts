@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MASV_BASE_URL, MASV_TEAM_ID, MASV_API_KEY } from "./env.ts";
+import { apiKey, baseUrl, teamId } from "./env.ts";
 import { masvFetch } from "./fetch.ts";
 
 const GetActivitiesSchema = z.object({
@@ -51,7 +51,7 @@ const GetActivitiesSchema = z.object({
 type GetActivitiesParams = z.infer<typeof GetActivitiesSchema>;
 
 async function getActivities(params: GetActivitiesParams) {
-  const url = new URL(`${MASV_BASE_URL}/v1.1/teams/${MASV_TEAM_ID}/activities`);
+  const url = new URL(`${baseUrl()}/v1.1/teams/${teamId()}/activities`);
 
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined) {
@@ -61,13 +61,22 @@ async function getActivities(params: GetActivitiesParams) {
 
   const headers = {
     "content-type": "application/json",
-    "x-api-key": MASV_API_KEY,
+    "x-api-key": apiKey(),
   };
 
   const data = await masvFetch(url, { headers });
 
-  const additionalContext = getActivitiesInformation();
-  data.activities_description = additionalContext;
+  // The reference text is attached to the payload, which only works on a plain
+  // object: null would throw a bare TypeError, and on an array the property is
+  // dropped by JSON.stringify, so the model would silently never receive it.
+  if (data === null || typeof data !== "object" || Array.isArray(data)) {
+    throw new Error(
+      `MASV returned an unexpected activities payload: expected an object, got ` +
+        `${Array.isArray(data) ? "an array" : data === null ? "null" : typeof data}.`,
+    );
+  }
+
+  data.activities_description = getActivitiesInformation();
 
   return data;
 }
@@ -79,11 +88,11 @@ const GetActivityEventsSchema = z.object({
 type GetActivityEventsParams = z.infer<typeof GetActivityEventsSchema>;
 
 async function getActivityEvents({ activityId }: GetActivityEventsParams) {
-  const url = new URL(`${MASV_BASE_URL}/v1/teams/${MASV_TEAM_ID}/activities/${activityId}/events`);
+  const url = new URL(`${baseUrl()}/v1/teams/${teamId()}/activities/${activityId}/events`);
 
   const headers = {
     "content-type": "application/json",
-    "x-api-key": MASV_API_KEY,
+    "x-api-key": apiKey(),
   };
 
   return masvFetch(url, { headers });

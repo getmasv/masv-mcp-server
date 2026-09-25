@@ -31,6 +31,7 @@
   "scripts": {
     "build": "tsc && chmod 755 build/index.js",
     "test": "node --test --import ./test/setup.ts 'test/{unit,tools}/**/*.test.ts'",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-include='src/**' --import ./test/setup.ts 'test/{unit,tools}/**/*.test.ts'",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "inspector": "npx @modelcontextprotocol/inspector node ./build/index.js",

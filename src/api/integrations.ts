@@ -1,25 +1,25 @@
 import { z } from "zod";
-import { MASV_BASE_URL, MASV_TEAM_ID, MASV_API_KEY } from "./env.ts";
+import { apiKey, baseUrl, teamId } from "./env.ts";
 import { getPackageToken } from "./packages.ts";
 import { masvFetch } from "./fetch.ts";
 
 async function getIntegrations() {
-  const url = new URL(`${MASV_BASE_URL}/v1/teams/${MASV_TEAM_ID}/cloud_connections`);
+  const url = new URL(`${baseUrl()}/v1/teams/${teamId()}/cloud_connections`);
 
   const headers = {
     "content-type": "application/json",
-    "x-api-key": MASV_API_KEY,
+    "x-api-key": apiKey(),
   };
 
   return masvFetch(url, { headers });
 }
 
 async function getIntegration(integrationId: string) {
-  const url = new URL(`${MASV_BASE_URL}/v1/cloud_connections/${integrationId}`);
+  const url = new URL(`${baseUrl()}/v1/cloud_connections/${integrationId}`);
 
   const headers = {
     "content-type": "application/json",
-    "x-api-key": MASV_API_KEY,
+    "x-api-key": apiKey(),
   };
 
   return masvFetch(url, { headers });
@@ -42,7 +42,7 @@ async function sendPackageToIntegration({
   packageId,
   integrationId,
 }: SendPackageToIntegrationParams) {
-  const url = new URL(`${MASV_BASE_URL}/v1/packages/${packageId}/transfer`);
+  const url = new URL(`${baseUrl()}/v1/packages/${packageId}/transfer`);
 
   const packageToken = await getPackageToken(packageId);
 
@@ -97,7 +97,7 @@ async function transferFilesFromIntegration({
   const provider = integration.provider;
 
   // Step 2: Create package
-  const createPackageUrl = new URL(`${MASV_BASE_URL}/v1/teams/${MASV_TEAM_ID}/packages`);
+  const createPackageUrl = new URL(`${baseUrl()}/v1/teams/${teamId()}/packages`);
 
   const createPackageBody = {
     name: packageName,
@@ -108,7 +108,7 @@ async function transferFilesFromIntegration({
 
   const createPackageHeaders = {
     "content-type": "application/json",
-    "x-api-key": MASV_API_KEY,
+    "x-api-key": apiKey(),
   };
 
   const packageData = await masvFetch(createPackageUrl, {
@@ -117,11 +117,18 @@ async function transferFilesFromIntegration({
     body: JSON.stringify(createPackageBody),
   });
 
-  const packageId = packageData.id;
-  const packageToken = packageData.access_token;
+  const packageId = packageData?.id;
+  const packageToken = packageData?.access_token;
+
+  if (!packageId || !packageToken) {
+    throw new Error(
+      "MASV created a package but did not return both an id and an access token for it, " +
+        "so the transfer cannot be started.",
+    );
+  }
 
   // Step 3: Initiate transfer
-  const transferUrl = new URL(`${MASV_BASE_URL}/v1/packages/${packageId}/transfer`);
+  const transferUrl = new URL(`${baseUrl()}/v1/packages/${packageId}/transfer`);
 
   const transferBody = {
     cloud_connection_id: integrationId,
@@ -224,7 +231,7 @@ async function listFilesOnIntegration({
 
   const headers = {
     "content-type": "application/json",
-    "x-api-key": MASV_API_KEY,
+    "x-api-key": apiKey(),
   };
 
   let files: any[];
@@ -242,7 +249,7 @@ async function listFilesOnIntegration({
     }
 
     const url = new URL(
-      `${MASV_BASE_URL}/v1/cloud_connections/providers/storage_gateway/${integrationId}/files`,
+      `${baseUrl()}/v1/cloud_connections/providers/storage_gateway/${integrationId}/files`,
     );
     if (path) url.searchParams.append("path", path);
     url.searchParams.append("offset", String(offset));
@@ -255,10 +262,13 @@ async function listFilesOnIntegration({
     hasMore = allFiles.length > PAGE_SIZE || data.more_data === true;
     files = allFiles.slice(0, PAGE_SIZE);
 
-    if (hasMore) {
+    // Advance by what this page actually returned, not by a whole page. The gateway
+    // can report more_data alongside a short page, and jumping PAGE_SIZE ahead of a
+    // short page skips the files in between.
+    if (hasMore && files.length > 0) {
       nextCursor = encodeCursor({
         type: "storage_gateway",
-        offset: offset + PAGE_SIZE,
+        offset: offset + files.length,
       });
     }
   } else {
@@ -270,7 +280,7 @@ async function listFilesOnIntegration({
       last_file_path = decoded.last_file_path;
     }
 
-    const url = new URL(`${MASV_BASE_URL}/v1/cloud_connections/${integrationId}/files`);
+    const url = new URL(`${baseUrl()}/v1/cloud_connections/${integrationId}/files`);
     if (path) url.searchParams.append("prefix", path);
     if (last_file_path) url.searchParams.append("prev_key", last_file_path);
 
@@ -283,9 +293,11 @@ async function listFilesOnIntegration({
     hasMore = allFiles.length > PAGE_SIZE;
     files = allFiles.slice(0, PAGE_SIZE);
 
-    if (hasMore) {
-      const lastFile = files[files.length - 1];
-      const lastPath = lastFile?.id || "";
+    // An empty last_file_path is sent as an empty prev_key, which the API reads as
+    // "start from the beginning" — so a paginating agent would re-read page 1
+    // forever. Better to report the truncation than to hand out that cursor.
+    const lastPath = files[files.length - 1]?.id;
+    if (hasMore && lastPath) {
       nextCursor = encodeCursor({ type: "cloud", last_file_path: lastPath });
     }
   }
@@ -310,6 +322,11 @@ async function listFilesOnIntegration({
   if (hasMore && nextCursor) {
     formattedLines.push(
       `\nMore results available. Call this tool again with cursor: ${nextCursor}`,
+    );
+  } else if (hasMore) {
+    formattedLines.push(
+      `\nMore results exist, but pagination cannot continue from this page: the last item ` +
+        `has no id to resume from. Narrow the search with a more specific path.`,
     );
   }
 
@@ -338,6 +355,7 @@ function formatFileSize(bytes: number): string {
 }
 
 export {
+  formatFileSize,
   getIntegrations,
   getIntegration,
   SendPackageToIntegrationSchema,
